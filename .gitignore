@@ -4,6 +4,7 @@
 *.dll
 *.so
 *.dylib
+synology-filesync
 
 # Test binary, built with `go test -c`
 *.test
