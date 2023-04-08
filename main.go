@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/pkg/sftp"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -136,6 +137,9 @@ func main() {
 		if err := writer.Flush(); err != nil {
 			log.Print(err)
 		}
+
+		// 파일 전송
+		uploadRemote(remoteIP, remotePort, remoteUsername, remotePassword)
 	}
 }
 
@@ -211,6 +215,89 @@ func searchSynoRecursive(ip, port, sid, folderPath string, depth int) error {
 	}
 
 	return nil
+}
+
+func uploadRemote(ip, port, username, password string) {
+	stopChan := make(chan int, 1)
+
+	sumOfSize = 0
+	wg.Add(1)
+	go func() {
+		defer func() {
+			stopChan <- 1
+			wg.Done()
+		}()
+
+		// ssh client 생성
+		client, err := NewSFTPClient(ip, port, username, password)
+		if err != nil {
+			log.Fatalf("fail to make srtp client: %v", err)
+		}
+		defer func() {
+			if err := client.Close(); err != nil {
+				log.Fatalf("fail to close sftp client: %v", err)
+			}
+		}()
+
+		if err := searchLocal(client, filepath.Join(localPath, synoPath)); err != nil {
+			log.Fatalf("fail to search local: %v", err)
+		}
+	}()
+	// go printProgress("Upload...", stopChan)
+	log.Print("Upload...")
+	wg.Wait()
+
+	close(stopChan)
+	log.Print("Done!")
+}
+
+func searchLocal(client *sftp.Client, folderPath string) error {
+	// 파일 시스템에서 파일 검색
+	err := filepath.Walk(folderPath, func(targetPath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !info.IsDir() && info.Name() != "metadata.yaml" {
+			// 전송에 성공했는지 확인
+			metadata, err := ReadMetadata(filepath.Dir(targetPath))
+			if err != nil {
+				return err
+			}
+
+			if status, ok := metadata[targetPath]; ok && status == string(Sent) {
+				log.Printf("%s has already been sent", targetPath)
+				return nil
+			}
+
+			size := 0
+			for {
+				// 파일 전송
+				size, err = SendFileOverSFTP(client, targetPath, filepath.Join(remotePath, strings.ReplaceAll(targetPath, localPath, "")))
+				if err != nil {
+					log.Printf("fail to %s send file over sftp: %v", targetPath, err)
+					log.Printf("retrying...")
+					time.Sleep(DELAY / 5)
+					continue
+				} else {
+					log.Printf("%s: %d", targetPath, size)
+					break
+				}
+			}
+
+			if size > 0 {
+				// 전송에 성공했다면 메타데이터 파일 업데이트
+				if err := WriteMetadata(targetPath, Sent); err != nil {
+					return err
+				}
+				time.Sleep(DELAY)
+			}
+		}
+
+		return nil
+	})
+
+	return err
 }
 
 func printProgress(title string, stop <-chan int) {
