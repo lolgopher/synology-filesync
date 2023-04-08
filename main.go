@@ -20,9 +20,9 @@ import (
 )
 
 const (
-	DELAY          = 10 * time.Second
-	DOWNLOAD_CYCLE = 12 * time.Hour
-	RESULT_PATH    = "filelist.txt"
+	DELAY         = 10 * time.Second
+	DownloadCycle = 12 * time.Hour
+	ResultPath    = "filelist.txt"
 )
 
 var (
@@ -85,7 +85,7 @@ func main() {
 	}
 
 	// 디운로드 file list 생성
-	f, err := os.Create(filepath.Join(localPath, RESULT_PATH))
+	f, err := os.Create(filepath.Join(localPath, ResultPath))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -106,7 +106,7 @@ func main() {
 		os.Exit(0)
 	}()
 
-	ticker := time.NewTicker(DOWNLOAD_CYCLE)
+	ticker := time.NewTicker(DownloadCycle)
 	defer ticker.Stop()
 
 	for ; true; <-ticker.C {
