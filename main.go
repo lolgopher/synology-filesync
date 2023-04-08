@@ -87,11 +87,16 @@ func main() {
 	// 디운로드 file list 생성
 	f, err := os.Create(filepath.Join(localPath, ResultPath))
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("fail to create %s file: %v", ResultPath, err)
 	}
 	defer func() {
-		writer.Flush()
-		f.Close()
+		if err := writer.Flush(); err != nil {
+			log.Print(err)
+		}
+
+		if err := f.Close(); err != nil {
+			log.Print(err)
+		}
 	}()
 	writer = bufio.NewWriter(f)
 
@@ -125,7 +130,10 @@ func downloadRemote(sid string) {
 			stopChan <- 1
 			wg.Done()
 		}()
-		searchRemoteRecursive(remotePath, sid, 0)
+
+		if err := searchRemoteRecursive(remotePath, sid, 0); err != nil {
+			log.Fatalf("fail to search synology filestation: %v", err)
+		}
 	}()
 	go printProgress("Download...", stopChan)
 	wg.Wait()
@@ -141,11 +149,15 @@ func searchRemoteRecursive(folderPath, sid string, depth int) error {
 	}
 
 	for _, file := range fileListResp.Data.Files {
-		writer.WriteString(strings.Repeat("\t", depth) + file.Name + "\n")
+		_, _ = writer.WriteString(strings.Repeat("\t", depth) + file.Name + "\n")
 
 		if file.IsDir {
-			os.MkdirAll(filepath.Join(localPath, file.Path), os.ModePerm)
-			searchRemoteRecursive(file.Path, sid, depth+1)
+			if err := os.MkdirAll(filepath.Join(localPath, file.Path), os.ModePerm); err != nil {
+				log.Fatalf("fail to make download folder: %v", err)
+			}
+			if err := searchRemoteRecursive(file.Path, sid, depth+1); err != nil {
+				return err
+			}
 		} else {
 			for {
 				if err := sem.Acquire(context.TODO(), 1); err != nil {
@@ -165,7 +177,7 @@ func searchRemoteRecursive(folderPath, sid string, depth int) error {
 				defer wg.Done()
 				_, size, err := DownloadFile(ip, port, sid, filePath, filepath.Join(localPath, folderPath, fileName))
 				if err != nil {
-					log.Fatal(err)
+					log.Fatalf("fail to %s download file: %v", filePath, err)
 				}
 				atomic.AddInt64(&sumOfSize, size)
 			}()

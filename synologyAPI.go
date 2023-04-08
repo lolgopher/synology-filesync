@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -39,11 +41,16 @@ func GetSessionID(ip, port, username, password string) (string, error) {
 	apiInfo.Set("session", "FileStation")
 
 	// 인증 API 호출
-	resp, err := http.Get(fmt.Sprintf("http://%s:%s/webapi/auth.cgi?%s", ip, port, apiInfo.Encode()))
+	synoURL := fmt.Sprintf("http://%s:%s/webapi/auth.cgi?%s", ip, port, apiInfo.Encode())
+	resp, err := http.Get(synoURL)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("fail to get %s url: %v", synoURL, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("fail to close %s request: %v", synoURL, err)
+		}
+	}()
 
 	// API 응답 해석
 	var authResponse struct {
@@ -53,7 +60,7 @@ func GetSessionID(ip, port, username, password string) (string, error) {
 	}
 	err = json.NewDecoder(resp.Body).Decode(&authResponse)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("fail to decode %s response body: %v", synoURL, err)
 	}
 
 	if authResponse.Data.Sid == "" {
@@ -61,7 +68,7 @@ func GetSessionID(ip, port, username, password string) (string, error) {
 		var errorResponse ErrorResponse
 		err = json.NewDecoder(resp.Body).Decode(&errorResponse)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("fail to decode %s authentication failed response body: %v", synoURL, err)
 		}
 		return "", fmt.Errorf("authentication failed: %v", errorResponse)
 	}
@@ -78,22 +85,27 @@ func GetFileList(ip, port, sid, folderPath string) (*FileListResponse, error) {
 	listInfo.Set("folder_path", folderPath)
 	listInfo.Set("_sid", sid)
 
-	resp, err := http.Get(fmt.Sprintf("http://%s:%s/webapi/entry.cgi?%s", ip, port, listInfo.Encode()))
+	synoURL := fmt.Sprintf("http://%s:%s/webapi/entry.cgi?%s", ip, port, listInfo.Encode())
+	resp, err := http.Get(synoURL)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fail to get %s url: %v", synoURL, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("fail to close %s request: %v", synoURL, err)
+		}
+	}()
 
 	// API 응답 해석
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fail to read %s response body: %v", synoURL, err)
 	}
 
 	fileListResponse := &FileListResponse{}
 	err = json.Unmarshal(body, fileListResponse)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fail to unmarshal %s response body: %v", synoURL, err)
 	}
 
 	return fileListResponse, nil
@@ -108,32 +120,51 @@ func DownloadFile(ip, port, sid, filePath, destPath string) (string, int64, erro
 	downloadInfo.Set("path", filePath)
 	downloadInfo.Set("_sid", sid)
 
-	resp, err := http.Get(fmt.Sprintf("http://%s:%s/webapi/entry.cgi?%s", ip, port, downloadInfo.Encode()))
+	synoURL := fmt.Sprintf("http://%s:%s/webapi/entry.cgi?%s", ip, port, downloadInfo.Encode())
+	resp, err := http.Get(synoURL)
 	if err != nil {
-		return "", 0, err
+		return "", 0, fmt.Errorf("fail to get %s url: %v", synoURL, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("fail to close %s request: %v", synoURL, err)
+		}
+	}()
 
 	// 파일 다운로드
 	tempPath := destPath + ".download"
 	out, err := os.Create(tempPath)
 	if err != nil {
-		return "", 0, err
+		return "", 0, fmt.Errorf("fail to create %s file: %v", tempPath, err)
 	}
-	defer out.Close()
+	defer func() {
+		if err := out.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
+			log.Printf("fail to close %s file: %v", tempPath, err)
+		}
+	}()
 
 	size, err := io.Copy(out, resp.Body)
 	if err != nil {
-		return "", 0, err
+		return "", 0, fmt.Errorf("fail to copy %s file: %v", tempPath, err)
 	}
-	out.Close()
+	if err := out.Close(); err != nil {
+		log.Printf("fail to close %s file: %v", tempPath, err)
+	}
+
+	if !FileExists(tempPath) {
+		if !FileExists(destPath) {
+			return "", 0, fmt.Errorf("file missing after download %s file", tempPath)
+		} else {
+			return destPath, size, nil
+		}
+	}
 
 	// 같은 파일인지 확인
 	existFile, err := os.Stat(destPath)
 	if err == nil {
 		isSame, err := IsSameFileSize(tempPath, existFile)
 		if err != nil {
-			return "", 0, err
+			return "", 0, fmt.Errorf("fail to check same file %s and %s: %v", destPath, tempPath, err)
 		}
 		if !isSame {
 			destPath = GetUniqueFilePath(destPath)
@@ -149,7 +180,7 @@ func DownloadFile(ip, port, sid, filePath, destPath string) (string, int64, erro
 
 			errCnt += 1
 			if errCnt >= 10 {
-				return "", 0, err
+				return "", 0, fmt.Errorf("fail to rename filename %s to %s: %v", tempPath, destPath, err)
 			}
 		} else {
 			break
