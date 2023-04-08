@@ -56,31 +56,26 @@ func main() {
 	// verify ip address
 	if ip == "" {
 		log.Fatal("ip address is required")
-		return
 	}
 
 	// verify port number
 	if _, err := net.LookupPort("tcp", port); err != nil {
 		log.Fatal("invalid port number")
-		return
 	}
 
 	// verify username and password
 	if username == "" || password == "" {
 		log.Fatal("username and password are required")
-		return
 	}
 
 	// verify local path
 	if localPath == "" {
 		log.Fatal("local path is required")
-		return
 	}
 
 	// verify remote path
 	if remotePath == "" {
 		log.Fatal("remote path is required")
-		return
 	}
 
 	// session id 가져오기
@@ -93,7 +88,6 @@ func main() {
 	f, err := os.Create(filepath.Join(localPath, RESULT_PATH))
 	if err != nil {
 		log.Fatal(err)
-		return
 	}
 	defer func() {
 		writer.Flush()
@@ -140,14 +134,13 @@ func downloadRemote(sid string) {
 	log.Print("Done!")
 }
 
-func searchRemoteRecursive(folderPath string, sid string, depth int) error {
+func searchRemoteRecursive(folderPath, sid string, depth int) error {
 	fileListResp, err := GetFileList(ip, port, sid, folderPath)
 	if err != nil {
 		return err
 	}
 
 	for _, file := range fileListResp.Data.Files {
-		// fmt.Println(strings.Repeat("    ", depth) + file.Name)
 		writer.WriteString(strings.Repeat("\t", depth) + file.Name + "\n")
 
 		if file.IsDir {
@@ -173,7 +166,6 @@ func searchRemoteRecursive(folderPath string, sid string, depth int) error {
 				_, size, err := DownloadFile(ip, port, sid, filePath, filepath.Join(localPath, folderPath, fileName))
 				if err != nil {
 					log.Fatal(err)
-					return
 				}
 				atomic.AddInt64(&sumOfSize, size)
 			}()

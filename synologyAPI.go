@@ -31,7 +31,7 @@ type ErrorResponse struct {
 	Message string `json:"message"`
 }
 
-func GetSessionID(ip string, port string, username string, password string) (string, error) {
+func GetSessionID(ip, port, username, password string) (string, error) {
 	// File Station API 인증 정보
 	apiInfo := url.Values{}
 	apiInfo.Set("api", "SYNO.API.Auth")
@@ -72,7 +72,7 @@ func GetSessionID(ip string, port string, username string, password string) (str
 	return authResponse.Data.Sid, nil
 }
 
-func GetFileList(ip string, port string, sid string, folderPath string) (*FileListResponse, error) {
+func GetFileList(ip, port, sid, folderPath string) (*FileListResponse, error) {
 	// FileStation.List API 호출
 	listInfo := url.Values{}
 	listInfo.Set("api", "SYNO.FileStation.List")
@@ -80,8 +80,6 @@ func GetFileList(ip string, port string, sid string, folderPath string) (*FileLi
 	listInfo.Set("method", "list")
 	listInfo.Set("folder_path", folderPath)
 	listInfo.Set("_sid", sid)
-
-	// fmt.Printf("API 호출: http://%s:%s/webapi/entry.cgi?%s\n", ip, port, listInfo.Encode())
 
 	resp, err := http.Get(fmt.Sprintf("http://%s:%s/webapi/entry.cgi?%s", ip, port, listInfo.Encode()))
 	if err != nil {
@@ -94,7 +92,6 @@ func GetFileList(ip string, port string, sid string, folderPath string) (*FileLi
 	if err != nil {
 		return nil, err
 	}
-	// fmt.Printf("API 응답: %s\n", string(body))
 
 	fileListResponse := &FileListResponse{}
 	err = json.Unmarshal(body, fileListResponse)
@@ -105,7 +102,7 @@ func GetFileList(ip string, port string, sid string, folderPath string) (*FileLi
 	return fileListResponse, nil
 }
 
-func DownloadFile(ip string, port string, sid string, filePath string, destPath string) (string, int64, error) {
+func DownloadFile(ip, port, sid, filePath, destPath string) (string, int64, error) {
 	// FileStation.Download API 호출
 	downloadInfo := url.Values{}
 	downloadInfo.Set("api", "SYNO.FileStation.Download")
@@ -113,8 +110,6 @@ func DownloadFile(ip string, port string, sid string, filePath string, destPath 
 	downloadInfo.Set("method", "download")
 	downloadInfo.Set("path", filePath)
 	downloadInfo.Set("_sid", sid)
-
-	// fmt.Printf("API 호출: http://%s:%s/webapi/entry.cgi?%s\n", ip, port, downloadInfo.Encode())
 
 	resp, err := http.Get(fmt.Sprintf("http://%s:%s/webapi/entry.cgi?%s", ip, port, downloadInfo.Encode()))
 	if err != nil {
@@ -165,7 +160,6 @@ func DownloadFile(ip string, port string, sid string, filePath string, destPath 
 		time.Sleep(1 * time.Second)
 	}
 
-	// fmt.Printf("%s 다운로드 완료\n", filePath)
 	return destPath, size, nil
 }
 
