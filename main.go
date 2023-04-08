@@ -16,7 +16,6 @@ import (
 	"syscall"
 	"time"
 
-	syno "github.com/lolgopher/synology-filesync/synologyAPI"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -85,7 +84,7 @@ func main() {
 	}
 
 	// session id 가져오기
-	sid, err := syno.GetSessionID(ip, port, username, password)
+	sid, err := GetSessionID(ip, port, username, password)
 	if err != nil {
 		log.Fatalf("fail to get session id: %v", err)
 	}
@@ -142,7 +141,7 @@ func downloadRemote(sid string) {
 }
 
 func searchRemoteRecursive(folderPath string, sid string, depth int) error {
-	fileListResp, err := syno.GetFileList(ip, port, sid, folderPath)
+	fileListResp, err := GetFileList(ip, port, sid, folderPath)
 	if err != nil {
 		return err
 	}
@@ -171,7 +170,7 @@ func searchRemoteRecursive(folderPath string, sid string, depth int) error {
 			go func() {
 				defer sem.Release(1)
 				defer wg.Done()
-				_, size, err := syno.DownloadFile(ip, port, sid, filePath, filepath.Join(localPath, folderPath, fileName))
+				_, size, err := DownloadFile(ip, port, sid, filePath, filepath.Join(localPath, folderPath, fileName))
 				if err != nil {
 					log.Fatal(err)
 					return
