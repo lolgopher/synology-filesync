@@ -22,7 +22,7 @@ import (
 const (
 	DELAY         = 10 * time.Second
 	DownloadCycle = 12 * time.Hour
-	ResultPath    = "files.txt"
+	ResultPath    = "./files.txt"
 )
 
 var (
@@ -83,7 +83,7 @@ func main() {
 	}
 
 	// 디운로드 file list 생성
-	f, err := os.Create(filepath.Join(localPath, ResultPath))
+	f, err := os.Create(ResultPath)
 	if err != nil {
 		log.Fatalf("fail to create %s file: %v", ResultPath, err)
 	}
@@ -115,6 +115,9 @@ func main() {
 	for ; true; <-ticker.C {
 		// FileStation.List API 호출
 		downloadSynology(synoIP, synoPort, sid)
+		if err := writer.Flush(); err != nil {
+			log.Print(err)
+		}
 	}
 }
 
@@ -150,11 +153,14 @@ func searchSynoRecursive(ip, port, sid, folderPath string, depth int) error {
 		_, _ = writer.WriteString(strings.Repeat("\t", depth) + file.Name + "\n")
 
 		if file.IsDir {
-			if err := os.MkdirAll(filepath.Join(localPath, file.Path), os.ModePerm); err != nil {
-				log.Fatalf("fail to make download folder: %v", err)
-			}
-			if err := searchSynoRecursive(ip, port, sid, file.Path, depth+1); err != nil {
-				return err
+			if file.Name != "#recycle" {
+				if err := os.MkdirAll(filepath.Join(localPath, file.Path), os.ModePerm); err != nil {
+					log.Fatalf("fail to make download folder: %v", err)
+				}
+
+				if err := searchSynoRecursive(ip, port, sid, file.Path, depth+1); err != nil {
+					return err
+				}
 			}
 		} else {
 			for {
