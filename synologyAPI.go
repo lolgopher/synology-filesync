@@ -4,12 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
-	"strings"
 	"time"
 )
 
@@ -134,19 +131,19 @@ func DownloadFile(ip, port, sid, filePath, destPath string) (string, int64, erro
 	// 같은 파일인지 확인
 	existFile, err := os.Stat(destPath)
 	if err == nil {
-		isSame, err := isSameFileSize(tempPath, existFile)
+		isSame, err := IsSameFileSize(tempPath, existFile)
 		if err != nil {
 			return "", 0, err
 		}
 		if !isSame {
-			destPath = getUniqueFilePath(destPath)
+			destPath = GetUniqueFilePath(destPath)
 		}
 	}
 
 	errCnt := 0
 	for {
 		if err := os.Rename(tempPath, destPath); err != nil {
-			if !fileExists(tempPath) {
+			if !FileExists(tempPath) {
 				break
 			}
 
@@ -161,36 +158,4 @@ func DownloadFile(ip, port, sid, filePath, destPath string) (string, int64, erro
 	}
 
 	return destPath, size, nil
-}
-
-func isSameFileSize(targetFile string, compareFile fs.FileInfo) (bool, error) {
-	target, err := os.Stat(targetFile)
-	if err != nil {
-		return false, err
-	}
-
-	if target.Size() != compareFile.Size() {
-		return false, nil
-	}
-
-	return true, nil
-}
-
-func getUniqueFilePath(filePath string) string {
-	dir := filepath.Dir(filePath)
-	ext := filepath.Ext(filePath)
-	name := strings.TrimSuffix(filepath.Base(filePath), ext)
-
-	// 파일 이름 뒤에 1부터 차례대로 숫자를 붙여가며 존재하지 않는 파일 이름 찾기
-	for i := 1; ; i++ {
-		newName := fmt.Sprintf("%s_%d%s", name, i, ext)
-		if !fileExists(filepath.Join(dir, newName)) {
-			return filepath.Join(dir, newName)
-		}
-	}
-}
-
-func fileExists(filePath string) bool {
-	_, err := os.Stat(filePath)
-	return !os.IsNotExist(err)
 }
