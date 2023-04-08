@@ -179,11 +179,15 @@ func searchSynoRecursive(ip, port, sid, folderPath string, depth int) error {
 			go func() {
 				defer sem.Release(1)
 				defer wg.Done()
-				_, size, err := DownloadFile(ip, port, sid, filePath, filepath.Join(localPath, folderPath, fileName))
+				downloadFilePath, size, err := DownloadFile(ip, port, sid, filePath, filepath.Join(localPath, folderPath, fileName))
 				if err != nil {
 					log.Fatalf("fail to %s download file: %v", filePath, err)
 				}
 				atomic.AddInt64(&sumOfSize, size)
+
+				if err := WriteMetadata(downloadFilePath, NotSent); err != nil {
+					log.Fatalf("fail to %s write metadata: %v", downloadFilePath, err)
+				}
 			}()
 		}
 	}
