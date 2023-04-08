@@ -16,21 +16,18 @@ import (
 	"syscall"
 	"time"
 
-	syno "github.com/lolgopher/synology-filesync/synologyAPI"
 	"golang.org/x/sync/semaphore"
 )
 
 const (
-	DELAY          = 10 * time.Second
-	DOWNLOAD_CYCLE = 12 * time.Hour
-	RESULT_PATH    = "filelist.txt"
+	DELAY         = 10 * time.Second
+	DownloadCycle = 12 * time.Hour
+	ResultPath    = "./files.txt"
 )
 
 var (
-	ip         string
-	port       string
-	localPath  string
-	remotePath string
+	localPath string
+	synoPath  string
 
 	writer    *bufio.Writer
 	sumOfSize int64
@@ -44,61 +41,60 @@ func main() {
 	rootPath, _ := os.Getwd()
 
 	// flag로 입력받을 변수 선언
-	ip = *flag.String("ip", "", "FileStation IP address")
-	port = *flag.String("port", "", "FileStation port")
-	username := *flag.String("id", "", "FileStation account username")
-	password := *flag.String("pw", "", "FileStation account password")
+	synoIP := *flag.String("synoip", "", "FileStation IP address")
+	synoPort := *flag.String("synoport", "", "FileStation port")
+	synoUsername := *flag.String("synoid", "", "FileStation account username")
+	synoPassword := *flag.String("synopw", "", "FileStation account password")
+	synoPath = *flag.String("synopath", "", "FileStation path to download files")
 	localPath = *flag.String("local", rootPath, "Local path to save download files")
-	remotePath = *flag.String("remote", "", "Remote path to download files")
 
 	// 입력받은 flag 값을 parsing
 	flag.Parse()
 
 	// verify ip address
-	if ip == "" {
+	if synoIP == "" {
 		log.Fatal("ip address is required")
-		return
 	}
 
 	// verify port number
-	if _, err := net.LookupPort("tcp", port); err != nil {
+	if _, err := net.LookupPort("tcp", synoPort); err != nil {
 		log.Fatal("invalid port number")
-		return
 	}
 
 	// verify username and password
-	if username == "" || password == "" {
+	if synoUsername == "" || synoPassword == "" {
 		log.Fatal("username and password are required")
-		return
 	}
 
 	// verify local path
 	if localPath == "" {
 		log.Fatal("local path is required")
-		return
 	}
 
-	// verify remote path
-	if remotePath == "" {
-		log.Fatal("remote path is required")
-		return
+	// verify syno path
+	if synoPath == "" {
+		log.Fatal("filestation path is required")
 	}
 
 	// session id 가져오기
-	sid, err := syno.GetSessionID(ip, port, username, password)
+	sid, err := GetSessionID(synoIP, synoPort, synoUsername, synoPassword)
 	if err != nil {
 		log.Fatalf("fail to get session id: %v", err)
 	}
 
 	// 디운로드 file list 생성
-	f, err := os.Create(filepath.Join(localPath, RESULT_PATH))
+	f, err := os.Create(ResultPath)
 	if err != nil {
-		log.Fatal(err)
-		return
+		log.Fatalf("fail to create %s file: %v", ResultPath, err)
 	}
 	defer func() {
-		writer.Flush()
-		f.Close()
+		if err := writer.Flush(); err != nil {
+			log.Print(err)
+		}
+
+		if err := f.Close(); err != nil {
+			log.Print(err)
+		}
 	}()
 	writer = bufio.NewWriter(f)
 
@@ -113,16 +109,19 @@ func main() {
 		os.Exit(0)
 	}()
 
-	ticker := time.NewTicker(DOWNLOAD_CYCLE)
+	ticker := time.NewTicker(DownloadCycle)
 	defer ticker.Stop()
 
 	for ; true; <-ticker.C {
 		// FileStation.List API 호출
-		downloadRemote(sid)
+		downloadSynology(synoIP, synoPort, sid)
+		if err := writer.Flush(); err != nil {
+			log.Print(err)
+		}
 	}
 }
 
-func downloadRemote(sid string) {
+func downloadSynology(ip, port, sid string) {
 	stopChan := make(chan int, 1)
 
 	sumOfSize = 0
@@ -132,7 +131,10 @@ func downloadRemote(sid string) {
 			stopChan <- 1
 			wg.Done()
 		}()
-		searchRemoteRecursive(remotePath, sid, 0)
+
+		if err := searchSynoRecursive(ip, port, sid, synoPath, 0); err != nil {
+			log.Fatalf("fail to search synology filestation: %v", err)
+		}
 	}()
 	go printProgress("Download...", stopChan)
 	wg.Wait()
@@ -141,19 +143,25 @@ func downloadRemote(sid string) {
 	log.Print("Done!")
 }
 
-func searchRemoteRecursive(folderPath string, sid string, depth int) error {
-	fileListResp, err := syno.GetFileList(ip, port, sid, folderPath)
+func searchSynoRecursive(ip, port, sid, folderPath string, depth int) error {
+	fileListResp, err := GetFileList(ip, port, sid, folderPath)
 	if err != nil {
 		return err
 	}
 
 	for _, file := range fileListResp.Data.Files {
-		// fmt.Println(strings.Repeat("    ", depth) + file.Name)
-		writer.WriteString(strings.Repeat("\t", depth) + file.Name + "\n")
+		_, _ = writer.WriteString(strings.Repeat("\t", depth) + file.Name + "\n")
 
 		if file.IsDir {
-			os.MkdirAll(filepath.Join(localPath, file.Path), os.ModePerm)
-			searchRemoteRecursive(file.Path, sid, depth+1)
+			if file.Name != "#recycle" {
+				if err := os.MkdirAll(filepath.Join(localPath, file.Path), os.ModePerm); err != nil {
+					log.Fatalf("fail to make download folder: %v", err)
+				}
+
+				if err := searchSynoRecursive(ip, port, sid, file.Path, depth+1); err != nil {
+					return err
+				}
+			}
 		} else {
 			for {
 				if err := sem.Acquire(context.TODO(), 1); err != nil {
@@ -171,10 +179,9 @@ func searchRemoteRecursive(folderPath string, sid string, depth int) error {
 			go func() {
 				defer sem.Release(1)
 				defer wg.Done()
-				_, size, err := syno.DownloadFile(ip, port, sid, filePath, filepath.Join(localPath, folderPath, fileName))
+				_, size, err := DownloadFile(ip, port, sid, filePath, filepath.Join(localPath, folderPath, fileName))
 				if err != nil {
-					log.Fatal(err)
-					return
+					log.Fatalf("fail to %s download file: %v", filePath, err)
 				}
 				atomic.AddInt64(&sumOfSize, size)
 			}()
