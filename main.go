@@ -26,8 +26,9 @@ const (
 )
 
 var (
-	localPath string
-	synoPath  string
+	synoPath   string
+	remotePath string
+	localPath  string
 
 	writer    *bufio.Writer
 	sumOfSize int64
@@ -46,34 +47,51 @@ func main() {
 	synoUsername := *flag.String("synoid", "", "FileStation account username")
 	synoPassword := *flag.String("synopw", "", "FileStation account password")
 	synoPath = *flag.String("synopath", "", "FileStation path to download files")
-	localPath = *flag.String("local", rootPath, "Local path to save download files")
+
+	remoteIP := *flag.String("remoteip", "", "Remote SSH IP address")
+	remotePort := *flag.String("remoteport", "", "Remote SSH port")
+	remoteUsername := *flag.String("remoteid", "", "Remote SSH username")
+	remotePassword := *flag.String("remotepw", "", "Remote SSH password")
+	remotePath = *flag.String("remotepath", "", "Remote path to download files")
+
+	localPath = *flag.String("localpath", rootPath, "Local path to save download files")
 
 	// 입력받은 flag 값을 parsing
 	flag.Parse()
 
 	// verify ip address
-	if synoIP == "" {
+	if synoIP == "" || remoteIP == "" {
 		log.Fatal("ip address is required")
 	}
 
 	// verify port number
+	if synoPort == "" || remotePort == "" {
+		log.Fatal("port is required")
+	}
 	if _, err := net.LookupPort("tcp", synoPort); err != nil {
-		log.Fatal("invalid port number")
+		log.Fatal("invalid synology port number")
+	}
+	if _, err := net.LookupPort("tcp", remotePort); err != nil {
+		log.Fatal("invalid remote port number")
 	}
 
 	// verify username and password
 	if synoUsername == "" || synoPassword == "" {
-		log.Fatal("username and password are required")
+		log.Fatal("synology username and password are required")
+	}
+	if remoteUsername == "" || remotePassword == "" {
+		log.Fatal("remote username and password are required")
 	}
 
-	// verify local path
-	if localPath == "" {
-		log.Fatal("local path is required")
-	}
-
-	// verify syno path
+	// verify path
 	if synoPath == "" {
 		log.Fatal("filestation path is required")
+	}
+	if remotePath == "" {
+		log.Fatal("remote path is required")
+	}
+	if localPath == "" {
+		log.Fatal("local path is required")
 	}
 
 	// session id 가져오기
