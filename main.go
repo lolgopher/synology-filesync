@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -21,12 +22,19 @@ import (
 )
 
 const (
+	programName = "synology-filesync"
+
 	delay         = 10 * time.Second
 	downloadCycle = 12 * time.Hour
 	resultPath    = "./files.txt"
 )
 
 var (
+	buildTag   = "unknown"
+	gitHash    = "unknown"
+	buildStamp = "unknown"
+	programVer = fmt.Sprintf("%s-%s(%s)", buildTag, gitHash, buildStamp)
+
 	synoPath   string
 	remotePath string
 	localPath  string
@@ -56,9 +64,17 @@ func main() {
 	flag.StringVar(&remotePath, "remotepath", "", "Remote path to download files")
 
 	flag.StringVar(&localPath, "localpath", rootPath, "Local path to save download files")
+	flagVer := *flag.Bool("v", false, "Show version")
 
 	// 입력받은 flag 값을 parsing
 	flag.Parse()
+
+	// print version
+	if flagVer {
+		log.Printf("%s-%s", programName, programVer)
+		os.Exit(0)
+	}
+	log.Printf("%s start (version: %s)", programName, programVer)
 
 	// verify ip address
 	if synoIP == "" || remoteIP == "" {
