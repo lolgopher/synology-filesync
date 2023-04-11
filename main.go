@@ -21,9 +21,9 @@ import (
 )
 
 const (
-	DELAY         = 10 * time.Second
-	DownloadCycle = 12 * time.Hour
-	ResultPath    = "./files.txt"
+	delay         = 10 * time.Second
+	downloadCycle = 12 * time.Hour
+	resultPath    = "./files.txt"
 )
 
 var (
@@ -47,15 +47,15 @@ func main() {
 	synoPort := *flag.String("synoport", "", "FileStation port")
 	synoUsername := *flag.String("synoid", "", "FileStation account username")
 	synoPassword := *flag.String("synopw", "", "FileStation account password")
-	synoPath = *flag.String("synopath", "", "FileStation path to download files")
+	flag.StringVar(&synoPath, "synopath", "", "FileStation path to download files")
 
 	remoteIP := *flag.String("remoteip", "", "Remote SSH IP address")
 	remotePort := *flag.String("remoteport", "", "Remote SSH port")
 	remoteUsername := *flag.String("remoteid", "", "Remote SSH username")
 	remotePassword := *flag.String("remotepw", "", "Remote SSH password")
-	remotePath = *flag.String("remotepath", "", "Remote path to download files")
+	flag.StringVar(&remotePath, "remotepath", "", "Remote path to download files")
 
-	localPath = *flag.String("localpath", rootPath, "Local path to save download files")
+	flag.StringVar(&localPath, "localpath", rootPath, "Local path to save download files")
 
 	// 입력받은 flag 값을 parsing
 	flag.Parse()
@@ -102,9 +102,9 @@ func main() {
 	}
 
 	// 디운로드 file list 생성
-	f, err := os.Create(ResultPath)
+	f, err := os.Create(resultPath)
 	if err != nil {
-		log.Fatalf("fail to create %s file: %v", ResultPath, err)
+		log.Fatalf("fail to create %s file: %v", resultPath, err)
 	}
 	defer func() {
 		if err := writer.Flush(); err != nil {
@@ -128,7 +128,7 @@ func main() {
 		os.Exit(0)
 	}()
 
-	ticker := time.NewTicker(DownloadCycle)
+	ticker := time.NewTicker(downloadCycle)
 	defer ticker.Stop()
 
 	for ; true; <-ticker.C {
@@ -277,7 +277,7 @@ func searchLocal(client *sftp.Client, folderPath string) error {
 				if err != nil {
 					log.Printf("fail to %s send file over sftp: %v", targetPath, err)
 					log.Printf("retrying...")
-					time.Sleep(DELAY / 5)
+					time.Sleep(delay / 5)
 					continue
 				} else {
 					log.Printf("%s: %d", targetPath, size)
@@ -290,7 +290,7 @@ func searchLocal(client *sftp.Client, folderPath string) error {
 				if err := WriteMetadata(targetPath, Sent); err != nil {
 					return err
 				}
-				time.Sleep(DELAY)
+				time.Sleep(delay)
 			}
 		}
 
@@ -301,7 +301,7 @@ func searchLocal(client *sftp.Client, folderPath string) error {
 }
 
 func printProgress(title string, stop <-chan int) {
-	ticker := time.NewTicker(DELAY)
+	ticker := time.NewTicker(delay)
 	defer ticker.Stop()
 
 	log.Print(title)
