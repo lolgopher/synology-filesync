@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path/filepath"
-	"strings"
 )
 
 func IsSameFileSize(targetFile string, compareFile fs.FileInfo) (bool, error) {
@@ -19,20 +17,6 @@ func IsSameFileSize(targetFile string, compareFile fs.FileInfo) (bool, error) {
 	}
 
 	return true, nil
-}
-
-func GetUniqueFilePath(filePath string) string {
-	dir := filepath.Dir(filePath)
-	ext := filepath.Ext(filePath)
-	name := strings.TrimSuffix(filepath.Base(filePath), ext)
-
-	// 파일 이름 뒤에 1부터 차례대로 숫자를 붙여가며 존재하지 않는 파일 이름 찾기
-	for i := 1; ; i++ {
-		newName := fmt.Sprintf("%s_%d%s", name, i, ext)
-		if !FileExists(filepath.Join(dir, newName)) {
-			return filepath.Join(dir, newName)
-		}
-	}
 }
 
 func FileExists(filePath string) bool {

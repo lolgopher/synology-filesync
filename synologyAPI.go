@@ -156,23 +156,12 @@ func DownloadFile(ip, port, sid, filePath, destPath string) (string, int64, erro
 		log.Printf("fail to close %s file: %v", tempPath, err)
 	}
 
+	// 방어 코드
 	if !FileExists(tempPath) {
 		if !FileExists(destPath) {
 			return "", 0, fmt.Errorf("file missing after download %s file", tempPath)
 		} else {
 			return destPath, size, nil
-		}
-	}
-
-	// 같은 파일인지 확인
-	existFile, err := os.Stat(destPath)
-	if err == nil {
-		isSame, err := IsSameFileSize(tempPath, existFile)
-		if err != nil {
-			return "", 0, fmt.Errorf("fail to check same file %s and %s: %v", destPath, tempPath, err)
-		}
-		if !isSame {
-			destPath = GetUniqueFilePath(destPath)
 		}
 	}
 

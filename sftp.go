@@ -49,7 +49,7 @@ func SendFileOverSFTP(client *sftp.Client, localFilePath, remoteFilePath string)
 		if isSame {
 			return 0, nil
 		} else {
-			remoteFilePath = GetUniqueFilePath(remoteFilePath)
+			return 0, fmt.Errorf("file %s already exist", remoteFilePath)
 		}
 	}
 
