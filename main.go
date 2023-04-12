@@ -260,13 +260,10 @@ func downloadSynologyRecursive(ip, port, sid string, fileList *FileListResponse)
 }
 
 func uploadRemote(ip, port, username, password string) {
-	stopChan := make(chan int, 1)
-
 	sumOfSize = 0
 	wg.Add(1)
 	go func() {
 		defer func() {
-			stopChan <- 1
 			wg.Done()
 		}()
 
@@ -285,11 +282,9 @@ func uploadRemote(ip, port, username, password string) {
 			log.Fatalf("fail to search local: %v", err)
 		}
 	}()
-	// go printProgress("Upload...", stopChan)
 	log.Print("Upload...")
 	wg.Wait()
 
-	close(stopChan)
 	log.Print("Done!")
 }
 
