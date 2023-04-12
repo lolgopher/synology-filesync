@@ -18,6 +18,7 @@ type FileListResponse struct {
 			Name  string `json:"name"`
 			Path  string `json:"path"`
 			IsDir bool   `json:"isdir"`
+			List  *FileListResponse
 		} `json:"files"`
 		Offset int `json:"offset"`
 		Total  int `json:"total"`

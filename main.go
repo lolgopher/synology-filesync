@@ -150,9 +150,6 @@ func main() {
 	for ; true; <-ticker.C {
 		// FileStation.List API 호출
 		downloadSynology(synoIP, synoPort, sid)
-		if err := writer.Flush(); err != nil {
-			log.Print(err)
-		}
 
 		// 파일 전송
 		uploadRemote(remoteIP, remotePort, remoteUsername, remotePassword)
@@ -166,44 +163,71 @@ func downloadSynology(ip, port, sid string) {
 	wg.Add(1)
 	go func() {
 		defer func() {
-			stopChan <- 1
 			wg.Done()
 		}()
 
-		if err := searchSynoRecursive(ip, port, sid, synoPath, 0); err != nil {
-			log.Fatalf("fail to search synology filestation: %v", err)
+		fileListResp, err := searchSynologyRecursive(ip, port, sid, synoPath, 0)
+		if err != nil {
+			log.Fatalf("fail to search from synology filestation: %v", err)
+		}
+
+		if err := writer.Flush(); err != nil {
+			log.Print(err)
+		}
+
+		if err := downloadSynologyRecursive(ip, port, sid, fileListResp); err != nil {
+			log.Fatalf("fail to download from synology filestation: %v", err)
 		}
 	}()
 	go printProgress("Download...", stopChan)
 	wg.Wait()
+	stopChan <- 1
 
 	close(stopChan)
 	log.Print("Done!")
 }
 
-func searchSynoRecursive(ip, port, sid, folderPath string, depth int) error {
+func searchSynologyRecursive(ip, port, sid, folderPath string, depth int) (*FileListResponse, error) {
 	fileListResp, err := GetFileList(ip, port, sid, folderPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	for _, file := range fileListResp.Data.Files {
+	for i, file := range fileListResp.Data.Files {
 		_, _ = writer.WriteString(strings.Repeat("\t", depth) + file.Name + "\n")
 
+		// 폴더이고 휴지통이 아니면 검색
+		if file.IsDir && file.Name != "#recycle" {
+			if err := os.MkdirAll(filepath.Join(localPath, file.Path), os.ModePerm); err != nil {
+				log.Fatalf("fail to make download folder: %v", err)
+			}
+
+			fileListResp.Data.Files[i].List, err = searchSynologyRecursive(ip, port, sid, file.Path, depth+1)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return fileListResp, nil
+}
+
+func downloadSynologyRecursive(ip, port, sid string, fileList *FileListResponse) error {
+	ctx := context.Background()
+
+	for _, file := range fileList.Data.Files {
+		// 폴더이고 휴지통이 아니면 검색
 		if file.IsDir {
 			if file.Name != "#recycle" {
-				if err := os.MkdirAll(filepath.Join(localPath, file.Path), os.ModePerm); err != nil {
-					log.Fatalf("fail to make download folder: %v", err)
-				}
-
-				if err := searchSynoRecursive(ip, port, sid, file.Path, depth+1); err != nil {
+				if err := downloadSynologyRecursive(ip, port, sid, file.List); err != nil {
 					return err
 				}
 			}
 		} else {
+			// 파일이면 다운로드
 			for {
-				if err := sem.Acquire(context.TODO(), 1); err != nil {
-					log.Printf("Failed to acquire semaphore: %v", err)
+				if err := sem.Acquire(ctx, 1); err != nil {
+					log.Printf("failed to acquire semaphore: %v", err)
 					continue
 				} else {
 					break
@@ -211,13 +235,15 @@ func searchSynoRecursive(ip, port, sid, folderPath string, depth int) error {
 			}
 
 			filePath := file.Path
-			fileName := file.Name
 
 			wg.Add(1)
 			go func() {
-				defer sem.Release(1)
-				defer wg.Done()
-				downloadFilePath, size, err := DownloadFile(ip, port, sid, filePath, filepath.Join(localPath, folderPath, fileName))
+				defer func() {
+					sem.Release(1)
+					wg.Done()
+				}()
+
+				downloadFilePath, size, err := DownloadFile(ip, port, sid, filePath, filepath.Join(localPath, filePath))
 				if err != nil {
 					log.Fatalf("fail to %s download file: %v", filePath, err)
 				}
@@ -234,13 +260,10 @@ func searchSynoRecursive(ip, port, sid, folderPath string, depth int) error {
 }
 
 func uploadRemote(ip, port, username, password string) {
-	stopChan := make(chan int, 1)
-
 	sumOfSize = 0
 	wg.Add(1)
 	go func() {
 		defer func() {
-			stopChan <- 1
 			wg.Done()
 		}()
 
@@ -259,11 +282,9 @@ func uploadRemote(ip, port, username, password string) {
 			log.Fatalf("fail to search local: %v", err)
 		}
 	}()
-	// go printProgress("Upload...", stopChan)
 	log.Print("Upload...")
 	wg.Wait()
 
-	close(stopChan)
 	log.Print("Done!")
 }
 
