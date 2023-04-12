@@ -210,8 +210,32 @@ func searchSynologyRecursive(ip, port, sid, folderPath string, depth int) (*File
 			}
 		} else {
 			initFilePath := filepath.Join(localPath, file.Path)
-			if err := WriteMetadata(initFilePath, file.Additional.Size, Init); err != nil {
-				log.Fatalf("fail to %s write metadata: %v", initFilePath, err)
+
+			// 메타데이터가 없으면 초기화
+			if !FileExists(filepath.Join(filepath.Dir(initFilePath), "metadata.yaml")) {
+				if err := WriteMetadata(initFilePath, file.Additional.Size, Init); err != nil {
+					log.Fatalf("fail to %s write metadata: %v", initFilePath, err)
+				}
+			} else {
+				// 이미 메타데이터가 존재하는지 확인
+				targetMetadata, err := ReadMetadata(filepath.Dir(initFilePath))
+				if err != nil {
+					return nil, err
+				}
+
+				// 메타데이터에 정보가 없거나 파일 크기가 다르면 초기화
+				if metadata, ok := targetMetadata[initFilePath]; !ok || metadata.Size != file.Additional.Size {
+					if err := WriteMetadata(initFilePath, file.Additional.Size, Init); err != nil {
+						log.Fatalf("fail to %s write metadata: %v", initFilePath, err)
+					}
+
+					// 기존 파일이 존재하면 삭제
+					if FileExists(initFilePath) {
+						if err := os.Remove(initFilePath); err != nil {
+							log.Fatalf("fail to %s remove file: %v", initFilePath, err)
+						}
+					}
+				}
 			}
 		}
 	}
@@ -250,7 +274,20 @@ func downloadSynologyRecursive(ip, port, sid string, fileList *FileListResponse)
 					wg.Done()
 				}()
 
-				downloadFilePath, size, err := DownloadFile(ip, port, sid, filePath, filepath.Join(localPath, filePath))
+				targetPath := filepath.Join(localPath, filePath)
+
+				// 초기화 상태인지 확인
+				targetMetadata, err := ReadMetadata(filepath.Dir(targetPath))
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				if metadata, ok := targetMetadata[targetPath]; ok && metadata.Status != string(Init) {
+					log.Printf("%s has already been download", targetPath)
+					return
+				}
+
+				downloadFilePath, size, err := DownloadFile(ip, port, sid, filePath, targetPath)
 				if err != nil {
 					log.Fatalf("fail to %s download file: %v", filePath, err)
 				}
