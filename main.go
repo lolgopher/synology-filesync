@@ -163,7 +163,6 @@ func downloadSynology(ip, port, sid string) {
 	wg.Add(1)
 	go func() {
 		defer func() {
-			stopChan <- 1
 			wg.Done()
 		}()
 
@@ -182,6 +181,7 @@ func downloadSynology(ip, port, sid string) {
 	}()
 	go printProgress("Download...", stopChan)
 	wg.Wait()
+	stopChan <- 1
 
 	close(stopChan)
 	log.Print("Done!")
