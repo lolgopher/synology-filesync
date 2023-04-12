@@ -15,10 +15,13 @@ import (
 type FileListResponse struct {
 	Data struct {
 		Files []struct {
-			Name  string `json:"name"`
-			Path  string `json:"path"`
-			IsDir bool   `json:"isdir"`
-			List  *FileListResponse
+			Name       string `json:"name"`
+			Path       string `json:"path"`
+			IsDir      bool   `json:"isdir"`
+			Additional struct {
+				Size int `json:"size"`
+			} `json:"additional"`
+			List *FileListResponse
 		} `json:"files"`
 		Offset int `json:"offset"`
 		Total  int `json:"total"`
@@ -85,6 +88,7 @@ func GetFileList(ip, port, sid, folderPath string) (*FileListResponse, error) {
 	listInfo.Set("method", "list")
 	listInfo.Set("folder_path", folderPath)
 	listInfo.Set("_sid", sid)
+	listInfo.Set("additional", "size")
 
 	synoURL := fmt.Sprintf("http://%s:%s/webapi/entry.cgi?%s", ip, port, listInfo.Encode())
 	resp, err := http.Get(synoURL)

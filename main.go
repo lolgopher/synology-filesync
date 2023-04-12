@@ -26,7 +26,7 @@ const (
 
 	delay         = 10 * time.Second
 	downloadCycle = 12 * time.Hour
-	resultPath    = "./files.txt"
+	resultPath    = "./synology_files.txt"
 )
 
 var (
@@ -197,14 +197,21 @@ func searchSynologyRecursive(ip, port, sid, folderPath string, depth int) (*File
 		_, _ = writer.WriteString(strings.Repeat("\t", depth) + file.Name + "\n")
 
 		// 폴더이고 휴지통이 아니면 검색
-		if file.IsDir && file.Name != "#recycle" {
-			if err := os.MkdirAll(filepath.Join(localPath, file.Path), os.ModePerm); err != nil {
-				log.Fatalf("fail to make download folder: %v", err)
-			}
+		if file.IsDir {
+			if file.Name != "#recycle" {
+				if err := os.MkdirAll(filepath.Join(localPath, file.Path), os.ModePerm); err != nil {
+					log.Fatalf("fail to make download folder: %v", err)
+				}
 
-			fileListResp.Data.Files[i].List, err = searchSynologyRecursive(ip, port, sid, file.Path, depth+1)
-			if err != nil {
-				return nil, err
+				fileListResp.Data.Files[i].List, err = searchSynologyRecursive(ip, port, sid, file.Path, depth+1)
+				if err != nil {
+					return nil, err
+				}
+			}
+		} else {
+			initFilePath := filepath.Join(localPath, file.Path)
+			if err := WriteMetadata(initFilePath, file.Additional.Size, Init); err != nil {
+				log.Fatalf("fail to %s write metadata: %v", initFilePath, err)
 			}
 		}
 	}
@@ -249,7 +256,7 @@ func downloadSynologyRecursive(ip, port, sid string, fileList *FileListResponse)
 				}
 				atomic.AddInt64(&sumOfSize, size)
 
-				if err := WriteMetadata(downloadFilePath, NotSent); err != nil {
+				if err := WriteMetadata(downloadFilePath, 0, NotSent); err != nil {
 					log.Fatalf("fail to %s write metadata: %v", downloadFilePath, err)
 				}
 			}()
@@ -297,12 +304,12 @@ func searchLocal(client *sftp.Client, folderPath string) error {
 
 		if !info.IsDir() && info.Name() != "metadata.yaml" {
 			// 전송에 성공했는지 확인
-			metadata, err := ReadMetadata(filepath.Dir(targetPath))
+			targetMetadata, err := ReadMetadata(filepath.Dir(targetPath))
 			if err != nil {
 				return err
 			}
 
-			if status, ok := metadata[targetPath]; ok && status == string(Sent) {
+			if metadata, ok := targetMetadata[targetPath]; ok && metadata.Status == string(Sent) {
 				log.Printf("%s has already been sent", targetPath)
 				return nil
 			}
@@ -324,7 +331,7 @@ func searchLocal(client *sftp.Client, folderPath string) error {
 
 			if size > 0 {
 				// 전송에 성공했다면 메타데이터 파일 업데이트
-				if err := WriteMetadata(targetPath, Sent); err != nil {
+				if err := WriteMetadata(targetPath, 0, Sent); err != nil {
 					return err
 				}
 				time.Sleep(delay)
