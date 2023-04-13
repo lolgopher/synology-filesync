@@ -15,10 +15,13 @@ import (
 type FileListResponse struct {
 	Data struct {
 		Files []struct {
-			Name  string `json:"name"`
-			Path  string `json:"path"`
-			IsDir bool   `json:"isdir"`
-			List  *FileListResponse
+			Name       string `json:"name"`
+			Path       string `json:"path"`
+			IsDir      bool   `json:"isdir"`
+			Additional struct {
+				Size int `json:"size"`
+			} `json:"additional"`
+			List *FileListResponse
 		} `json:"files"`
 		Offset int `json:"offset"`
 		Total  int `json:"total"`
@@ -85,6 +88,7 @@ func GetFileList(ip, port, sid, folderPath string) (*FileListResponse, error) {
 	listInfo.Set("method", "list")
 	listInfo.Set("folder_path", folderPath)
 	listInfo.Set("_sid", sid)
+	listInfo.Set("additional", "size")
 
 	synoURL := fmt.Sprintf("http://%s:%s/webapi/entry.cgi?%s", ip, port, listInfo.Encode())
 	resp, err := http.Get(synoURL)
@@ -152,23 +156,12 @@ func DownloadFile(ip, port, sid, filePath, destPath string) (string, int64, erro
 		log.Printf("fail to close %s file: %v", tempPath, err)
 	}
 
+	// 방어 코드
 	if !FileExists(tempPath) {
 		if !FileExists(destPath) {
 			return "", 0, fmt.Errorf("file missing after download %s file", tempPath)
 		} else {
 			return destPath, size, nil
-		}
-	}
-
-	// 같은 파일인지 확인
-	existFile, err := os.Stat(destPath)
-	if err == nil {
-		isSame, err := IsSameFileSize(tempPath, existFile)
-		if err != nil {
-			return "", 0, fmt.Errorf("fail to check same file %s and %s: %v", destPath, tempPath, err)
-		}
-		if !isSame {
-			destPath = GetUniqueFilePath(destPath)
 		}
 	}
 

@@ -26,7 +26,7 @@ const (
 
 	delay         = 10 * time.Second
 	downloadCycle = 12 * time.Hour
-	resultPath    = "./files.txt"
+	resultPath    = "./synology_files.txt"
 )
 
 var (
@@ -197,14 +197,45 @@ func searchSynologyRecursive(ip, port, sid, folderPath string, depth int) (*File
 		_, _ = writer.WriteString(strings.Repeat("\t", depth) + file.Name + "\n")
 
 		// 폴더이고 휴지통이 아니면 검색
-		if file.IsDir && file.Name != "#recycle" {
-			if err := os.MkdirAll(filepath.Join(localPath, file.Path), os.ModePerm); err != nil {
-				log.Fatalf("fail to make download folder: %v", err)
-			}
+		if file.IsDir {
+			if file.Name != "#recycle" {
+				if err := os.MkdirAll(filepath.Join(localPath, file.Path), os.ModePerm); err != nil {
+					log.Fatalf("fail to make download folder: %v", err)
+				}
 
-			fileListResp.Data.Files[i].List, err = searchSynologyRecursive(ip, port, sid, file.Path, depth+1)
-			if err != nil {
-				return nil, err
+				fileListResp.Data.Files[i].List, err = searchSynologyRecursive(ip, port, sid, file.Path, depth+1)
+				if err != nil {
+					return nil, err
+				}
+			}
+		} else {
+			initFilePath := filepath.Join(localPath, file.Path)
+
+			// 메타데이터가 없으면 초기화
+			if !FileExists(filepath.Join(filepath.Dir(initFilePath), "metadata.yaml")) {
+				if err := WriteMetadata(initFilePath, file.Additional.Size, Init); err != nil {
+					log.Fatalf("fail to %s write metadata: %v", initFilePath, err)
+				}
+			} else {
+				// 이미 메타데이터가 존재하는지 확인
+				targetMetadata, err := ReadMetadata(filepath.Dir(initFilePath))
+				if err != nil {
+					return nil, err
+				}
+
+				// 메타데이터에 정보가 없거나 파일 크기가 다르면 초기화
+				if metadata, ok := targetMetadata[initFilePath]; !ok || metadata.Size != file.Additional.Size {
+					if err := WriteMetadata(initFilePath, file.Additional.Size, Init); err != nil {
+						log.Fatalf("fail to %s write metadata: %v", initFilePath, err)
+					}
+
+					// 기존 파일이 존재하면 삭제
+					if FileExists(initFilePath) {
+						if err := os.Remove(initFilePath); err != nil {
+							log.Fatalf("fail to %s remove file: %v", initFilePath, err)
+						}
+					}
+				}
 			}
 		}
 	}
@@ -243,13 +274,26 @@ func downloadSynologyRecursive(ip, port, sid string, fileList *FileListResponse)
 					wg.Done()
 				}()
 
-				downloadFilePath, size, err := DownloadFile(ip, port, sid, filePath, filepath.Join(localPath, filePath))
+				targetPath := filepath.Join(localPath, filePath)
+
+				// 초기화 상태인지 확인
+				targetMetadata, err := ReadMetadata(filepath.Dir(targetPath))
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				if metadata, ok := targetMetadata[targetPath]; ok && metadata.Status != string(Init) {
+					log.Printf("%s has already been download", targetPath)
+					return
+				}
+
+				downloadFilePath, size, err := DownloadFile(ip, port, sid, filePath, targetPath)
 				if err != nil {
 					log.Fatalf("fail to %s download file: %v", filePath, err)
 				}
 				atomic.AddInt64(&sumOfSize, size)
 
-				if err := WriteMetadata(downloadFilePath, NotSent); err != nil {
+				if err := WriteMetadata(downloadFilePath, 0, NotSent); err != nil {
 					log.Fatalf("fail to %s write metadata: %v", downloadFilePath, err)
 				}
 			}()
@@ -297,12 +341,12 @@ func searchLocal(client *sftp.Client, folderPath string) error {
 
 		if !info.IsDir() && info.Name() != "metadata.yaml" {
 			// 전송에 성공했는지 확인
-			metadata, err := ReadMetadata(filepath.Dir(targetPath))
+			targetMetadata, err := ReadMetadata(filepath.Dir(targetPath))
 			if err != nil {
 				return err
 			}
 
-			if status, ok := metadata[targetPath]; ok && status == string(Sent) {
+			if metadata, ok := targetMetadata[targetPath]; ok && metadata.Status == string(Sent) {
 				log.Printf("%s has already been sent", targetPath)
 				return nil
 			}
@@ -324,7 +368,7 @@ func searchLocal(client *sftp.Client, folderPath string) error {
 
 			if size > 0 {
 				// 전송에 성공했다면 메타데이터 파일 업데이트
-				if err := WriteMetadata(targetPath, Sent); err != nil {
+				if err := WriteMetadata(targetPath, 0, Sent); err != nil {
 					return err
 				}
 				time.Sleep(delay)
