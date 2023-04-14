@@ -73,6 +73,22 @@ func main() {
 	// 입력받은 flag 값을 parsing
 	flag.Parse()
 
+	// print flag value
+	log.Printf("synoip: %v", synoIP)
+	log.Printf("synoport: %v", synoPort)
+	log.Printf("synoid: %v", synoUsername)
+	log.Printf("synopw: %v", synoPassword)
+	log.Printf("synopath: %v", synoPath)
+
+	log.Printf("remoteip: %v", remoteIP)
+	log.Printf("remoteport: %v", remotePort)
+	log.Printf("remoteid: %v", remoteUsername)
+	log.Printf("remotepw: %v", remotePassword)
+	log.Printf("remotepath: %v", remotePath)
+
+	log.Printf("localpath: %v", localPath)
+	log.Printf("v: %v", flagVer)
+
 	// print version
 	if flagVer {
 		log.Printf("%s-%s", programName, programVer)
