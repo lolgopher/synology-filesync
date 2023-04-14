@@ -46,21 +46,29 @@ var (
 func main() {
 	rootPath, _ := os.Getwd()
 
+	var (
+		synoIP, remoteIP             string
+		synoPort, remotePort         string
+		synoUsername, remoteUsername string
+		synoPassword, remotePassword string
+		flagVer                      bool
+	)
+
 	// flag로 입력받을 변수 선언
-	synoIP := *flag.String("synoip", "", "FileStation IP address")
-	synoPort := *flag.String("synoport", "", "FileStation port")
-	synoUsername := *flag.String("synoid", "", "FileStation account username")
-	synoPassword := *flag.String("synopw", "", "FileStation account password")
+	flag.StringVar(&synoIP, "synoip", "", "FileStation IP address")
+	flag.StringVar(&synoPort, "synoport", "", "FileStation port")
+	flag.StringVar(&synoUsername, "synoid", "", "FileStation account username")
+	flag.StringVar(&synoPassword, "synopw", "", "FileStation account password")
 	flag.StringVar(&synoPath, "synopath", "", "FileStation path to download files")
 
-	remoteIP := *flag.String("remoteip", "", "Remote SSH IP address")
-	remotePort := *flag.String("remoteport", "", "Remote SSH port")
-	remoteUsername := *flag.String("remoteid", "", "Remote SSH username")
-	remotePassword := *flag.String("remotepw", "", "Remote SSH password")
+	flag.StringVar(&remoteIP, "remoteip", "", "Remote SSH IP address")
+	flag.StringVar(&remotePort, "remoteport", "", "Remote SSH port")
+	flag.StringVar(&remoteUsername, "remoteid", "", "Remote SSH username")
+	flag.StringVar(&remotePassword, "remotepw", "", "Remote SSH password")
 	flag.StringVar(&remotePath, "remotepath", "", "Remote path to download files")
 
 	flag.StringVar(&localPath, "localpath", rootPath, "Local path to save download files")
-	flagVer := *flag.Bool("v", false, "Show version")
+	flag.BoolVar(&flagVer, "v", false, "Show version")
 
 	// 입력받은 flag 값을 parsing
 	flag.Parse()
