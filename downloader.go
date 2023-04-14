@@ -47,7 +47,7 @@ func searchSynologyRecursive(ip, port, sid, folderPath string, depth int) (*prot
 		return nil, err
 	}
 
-	for i, file := range fileListResp.Data.Files {
+	for _, file := range fileListResp.Data.Files {
 		_, _ = writer.WriteString(strings.Repeat("\t", depth) + file.Name + "\n")
 
 		// 폴더이고 휴지통이 아니면 검색
@@ -57,7 +57,7 @@ func searchSynologyRecursive(ip, port, sid, folderPath string, depth int) (*prot
 					log.Fatalf("fail to make download folder: %v", err)
 				}
 
-				fileListResp.Data.Files[i].List, err = searchSynologyRecursive(ip, port, sid, file.Path, depth+1)
+				file.List, err = searchSynologyRecursive(ip, port, sid, file.Path, depth+1)
 				if err != nil {
 					return nil, err
 				}
