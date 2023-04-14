@@ -1,4 +1,4 @@
-package main
+package protocol
 
 import (
 	"encoding/json"
@@ -113,6 +113,9 @@ func GetFileList(ip, port, sid, folderPath string) (*FileListResponse, error) {
 		return nil, fmt.Errorf("fail to unmarshal %s response body: %v", synoURL, err)
 	}
 
+	if !fileListResponse.Success {
+		log.Printf("success flag is false: %v", fileListResponse)
+	}
 	return fileListResponse, nil
 }
 

@@ -16,7 +16,6 @@ RUN go get
 RUN go mod tidy
 RUN go mod download
 
-
 RUN go test
 RUN if [ "$BUILD_TAG" = "unknown" ]; then export BUILD_TAG=dev; fi \
     && if [ "$BUILD_TIME" = "unknown" ]; then export BUILD_TIME=$(date '+%Y-%m-%d_%H:%M:%S_%Z'); fi \
@@ -28,8 +27,23 @@ RUN strip /build/app
 RUN upx -q -9 /build/app
 
 # ---
-FROM scratch
+FROM alpine
+
+ENV SYNOLOGY_IP="" \
+    SYNOLOGY_PORT="" \
+    SYNOLOGY_ID="" \
+    SYNOLOGY_PW="" \
+    SYNOLGOY_PATH="" \
+    REMOTE_IP="" \
+    REMOTE_PORT="" \
+    REMOTE_ID="" \
+    REMOTE_PW="" \
+    REMOTE_PATH="" \
+    LOCAL_PATH=""
 
 COPY --from=builder /build/app .
+COPY --from=builder /build/entrypoint.sh .
 
-ENTRYPOINT ["./app"]
+RUN chmod +x entrypoint.sh
+
+ENTRYPOINT ["./entrypoint.sh"]
