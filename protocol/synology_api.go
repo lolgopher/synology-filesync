@@ -14,19 +14,21 @@ import (
 
 type FileListResponse struct {
 	Data struct {
-		Files []struct {
-			Name       string `json:"name"`
-			Path       string `json:"path"`
-			IsDir      bool   `json:"isdir"`
-			Additional struct {
-				Size int `json:"size"`
-			} `json:"additional"`
-			List *FileListResponse
-		} `json:"files"`
-		Offset int `json:"offset"`
-		Total  int `json:"total"`
+		Files  []*File `json:"files"`
+		Offset int     `json:"offset"`
+		Total  int     `json:"total"`
 	} `json:"data"`
 	Success bool `json:"success"`
+}
+
+type File struct {
+	Name       string `json:"name"`
+	Path       string `json:"path"`
+	IsDir      bool   `json:"isdir"`
+	Additional struct {
+		Size int `json:"size"`
+	} `json:"additional"`
+	List *FileListResponse
 }
 
 type ErrorResponse struct {

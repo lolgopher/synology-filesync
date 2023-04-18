@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"flag"
 	"fmt"
 	"github.com/lolgopher/synology-filesync/protocol"
@@ -94,41 +95,10 @@ func main() {
 		log.Printf("%s-%s", programName, programVer)
 		os.Exit(0)
 	}
+
 	log.Printf("%s start (version: %s)", programName, programVer)
-
-	// verify ip address
-	if synoIP == "" || remoteIP == "" {
-		log.Fatal("ip address is required")
-	}
-
-	// verify port number
-	if synoPort == "" || remotePort == "" {
-		log.Fatal("port is required")
-	}
-	if _, err := net.LookupPort("tcp", synoPort); err != nil {
-		log.Fatal("invalid synology port number")
-	}
-	if _, err := net.LookupPort("tcp", remotePort); err != nil {
-		log.Fatal("invalid remote port number")
-	}
-
-	// verify username and password
-	if synoUsername == "" || synoPassword == "" {
-		log.Fatal("synology username and password are required")
-	}
-	if remoteUsername == "" || remotePassword == "" {
-		log.Fatal("remote username and password are required")
-	}
-
-	// verify path
-	if synoPath == "" {
-		log.Fatal("filestation path is required")
-	}
-	if remotePath == "" {
-		log.Fatal("remote path is required")
-	}
-	if localPath == "" {
-		log.Fatal("local path is required")
+	if err := verifyFlag(synoIP, remoteIP, synoPort, remotePort, synoUsername, remoteUsername, synoPassword, remotePassword); err != nil {
+		log.Fatalf("fail to verify flag: %v", err)
 	}
 
 	// session id 가져오기
@@ -174,6 +144,50 @@ func main() {
 		// 파일 전송
 		uploadRemote(remoteIP, remotePort, remoteUsername, remotePassword)
 	}
+}
+
+func verifyFlag(
+	synoIP, remoteIP,
+	synoPort, remotePort,
+	synoUsername, remoteUsername,
+	synoPassword, remotePassword string) error {
+
+	// verify ip address
+	if synoIP == "" || remoteIP == "" {
+		return errors.New("ip address is required")
+	}
+
+	// verify port number
+	if synoPort == "" || remotePort == "" {
+		return errors.New("port is required")
+	}
+	if _, err := net.LookupPort("tcp", synoPort); err != nil {
+		return errors.New("invalid synology port number")
+	}
+	if _, err := net.LookupPort("tcp", remotePort); err != nil {
+		return errors.New("invalid remote port number")
+	}
+
+	// verify username and password
+	if synoUsername == "" || synoPassword == "" {
+		return errors.New("synology username and password are required")
+	}
+	if remoteUsername == "" || remotePassword == "" {
+		return errors.New("remote username and password are required")
+	}
+
+	// verify path
+	if synoPath == "" {
+		return errors.New("filestation path is required")
+	}
+	if remotePath == "" {
+		return errors.New("remote path is required")
+	}
+	if localPath == "" {
+		return errors.New("local path is required")
+	}
+
+	return nil
 }
 
 func printProgress(title string, stop <-chan int) {
