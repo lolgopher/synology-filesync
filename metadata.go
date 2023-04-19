@@ -10,7 +10,7 @@ import (
 )
 
 type FileMetadata struct {
-	Size   int    `yaml:"size"`
+	Size   uint64 `yaml:"size"`
 	Status string `yaml:"status"`
 }
 
@@ -43,7 +43,7 @@ func ReadMetadata(folderPath string) (map[string]FileMetadata, error) {
 	return metadata, nil
 }
 
-func WriteMetadata(filePath string, size int, status FileTransferStatus) error {
+func WriteMetadata(filePath string, size uint64, status FileTransferStatus) error {
 	// 크리티컬 섹션 설정
 	mu.Lock()
 	defer mu.Unlock()
