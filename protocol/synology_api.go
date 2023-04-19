@@ -26,7 +26,7 @@ type File struct {
 	Path       string `json:"path"`
 	IsDir      bool   `json:"isdir"`
 	Additional struct {
-		Size int `json:"size"`
+		Size uint64 `json:"size"`
 	} `json:"additional"`
 	List *FileListResponse
 }
