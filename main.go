@@ -137,12 +137,20 @@ func main() {
 	ticker := time.NewTicker(downloadCycle)
 	defer ticker.Stop()
 
+	// 연결 정보 설정
+	remoteInfo := &protocol.ConnectionInfo{
+		IP:       remoteIP,
+		Port:     remotePort,
+		Username: remoteUsername,
+		Password: remotePassword,
+	}
+
 	for ; true; <-ticker.C {
 		// FileStation.List API 호출
 		downloadSynology(synoIP, synoPort, sid)
 
 		// 파일 전송
-		uploadRemote(remoteIP, remotePort, remoteUsername, remotePassword)
+		uploadRemote(remoteInfo)
 	}
 }
 
