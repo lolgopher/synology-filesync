@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -37,6 +38,7 @@ func ReadMetadata(folderPath string) (map[string]FileMetadata, error) {
 	// YAML 언마샬링
 	var metadata map[string]FileMetadata
 	if err := yaml.Unmarshal(data, &metadata); err != nil {
+		log.Printf("error to unmarshal read data: %s", string(data))
 		return nil, fmt.Errorf("fail to unmarshal %s metadata file: %v", metadataFilePath, err)
 	}
 
@@ -65,6 +67,7 @@ func WriteMetadata(filePath string, size uint64, status FileTransferStatus) erro
 	// 메타데이터 맵 생성 또는 업데이트
 	metadata := make(map[string]FileMetadata)
 	if err := yaml.Unmarshal(data, &metadata); err != nil && !os.IsNotExist(err) {
+		log.Printf("error to unmarshal write data: %s", string(data))
 		return fmt.Errorf("fail to unmarshal %s metadata file: %v", metadataFilePath, err)
 	}
 	if status != Init {

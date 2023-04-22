@@ -132,6 +132,7 @@ func (client *SynologyClient) GetFileList(folderPath string) (*FileListResponse,
 	fileListResponse := &FileListResponse{}
 	err = json.Unmarshal(body, fileListResponse)
 	if err != nil {
+		log.Printf("error to unmarshal body data: %s", string(body))
 		return nil, fmt.Errorf("fail to unmarshal %s response body: %v", synoURL, err)
 	}
 
