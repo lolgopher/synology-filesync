@@ -8,9 +8,16 @@ import (
 	"path/filepath"
 	"strings"
 	"sync/atomic"
+	"time"
 )
 
-func downloadSynology(ip, port, sid string) {
+func downloadSynology(info *protocol.ConnectionInfo) {
+	// synology client 생성
+	synoClient, err := protocol.NewSynologyClient(info)
+	if err != nil {
+		log.Fatalf("fail to make synology client: %v", err)
+	}
+
 	stopChan := make(chan int, 1)
 
 	sumOfSize = 0
@@ -20,7 +27,7 @@ func downloadSynology(ip, port, sid string) {
 			wg.Done()
 		}()
 
-		fileListResp, err := searchSynologyRecursive(ip, port, sid, synoPath, 0)
+		fileListResp, err := searchSynologyRecursive(synoClient, synoPath, 0)
 		if err != nil {
 			log.Fatalf("fail to search from synology filestation: %v", err)
 		}
@@ -29,7 +36,7 @@ func downloadSynology(ip, port, sid string) {
 			log.Print(err)
 		}
 
-		if err := downloadSynologyRecursive(ip, port, sid, fileListResp); err != nil {
+		if err := downloadSynologyRecursive(synoClient, fileListResp); err != nil {
 			log.Fatalf("fail to download from synology filestation: %v", err)
 		}
 	}()
@@ -41,8 +48,8 @@ func downloadSynology(ip, port, sid string) {
 	log.Print("Done!")
 }
 
-func searchSynologyRecursive(ip, port, sid, folderPath string, depth int) (*protocol.FileListResponse, error) {
-	fileListResp, err := protocol.GetFileList(ip, port, sid, folderPath)
+func searchSynologyRecursive(client *protocol.SynologyClient, folderPath string, depth int) (*protocol.FileListResponse, error) {
+	fileListResp, err := client.GetFileList(folderPath)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +64,7 @@ func searchSynologyRecursive(ip, port, sid, folderPath string, depth int) (*prot
 					log.Fatalf("fail to make download folder: %v", err)
 				}
 
-				file.List, err = searchSynologyRecursive(ip, port, sid, file.Path, depth+1)
+				file.List, err = searchSynologyRecursive(client, file.Path, depth+1)
 				if err != nil {
 					return nil, err
 				}
@@ -97,14 +104,14 @@ func searchSynologyRecursive(ip, port, sid, folderPath string, depth int) (*prot
 	return fileListResp, nil
 }
 
-func downloadSynologyRecursive(ip, port, sid string, fileList *protocol.FileListResponse) error {
+func downloadSynologyRecursive(client *protocol.SynologyClient, fileList *protocol.FileListResponse) error {
 	ctx := context.Background()
 
 	for _, file := range fileList.Data.Files {
 		// 폴더이고 휴지통이 아니면 검색
 		if file.IsDir {
 			if file.Name != "#recycle" {
-				if err := downloadSynologyRecursive(ip, port, sid, file.List); err != nil {
+				if err := downloadSynologyRecursive(client, file.List); err != nil {
 					return err
 				}
 			}
@@ -141,7 +148,7 @@ func downloadSynologyRecursive(ip, port, sid string, fileList *protocol.FileList
 					return
 				}
 
-				downloadFilePath, size, err := protocol.DownloadFile(ip, port, sid, filePath, targetPath)
+				downloadFilePath, size, err := client.DownloadFile(filePath, targetPath)
 				if err != nil {
 					log.Fatalf("fail to %s download file: %v", filePath, err)
 				}
@@ -155,4 +162,19 @@ func downloadSynologyRecursive(ip, port, sid string, fileList *protocol.FileList
 	}
 
 	return nil
+}
+
+func printProgress(title string, stop <-chan int) {
+	ticker := time.NewTicker(delay)
+	defer ticker.Stop()
+
+	log.Print(title)
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			log.Printf("%07d MBytes", sumOfSize/1024/1024)
+		}
+	}
 }

@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func uploadRemote(ip, port, username, password string) {
+func uploadRemote(info *protocol.ConnectionInfo) {
 	sumOfSize = 0
 	wg.Add(1)
 	go func() {
@@ -19,7 +19,7 @@ func uploadRemote(ip, port, username, password string) {
 		}()
 
 		// ssh client 생성
-		client, err := protocol.NewSFTPClient(ip, port, username, password)
+		client, err := protocol.NewSFTPClient(info)
 		if err != nil {
 			log.Fatalf("fail to make srtp client: %v", err)
 		}

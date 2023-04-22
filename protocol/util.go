@@ -6,6 +6,13 @@ import (
 	"os"
 )
 
+type ConnectionInfo struct {
+	IP       string
+	Port     string
+	Username string
+	Password string
+}
+
 func IsSameFileSize(targetFile string, compareFile fs.FileInfo) (bool, error) {
 	target, err := os.Stat(targetFile)
 	if err != nil {

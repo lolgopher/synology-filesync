@@ -11,18 +11,18 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func NewSFTPClient(ip, port, user, password string) (*sftp.Client, error) {
+func NewSFTPClient(info *ConnectionInfo) (*sftp.Client, error) {
 	// SSH 연결 정보 설정
 	sshConfig := &ssh.ClientConfig{
-		User: user,
+		User: info.Username,
 		Auth: []ssh.AuthMethod{
-			ssh.Password(password),
+			ssh.Password(info.Password),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
 	// SSH 클라이언트 생성
-	addr := fmt.Sprintf("%s:%s", ip, port)
+	addr := fmt.Sprintf("%s:%s", info.IP, info.Port)
 	sshClient, err := ssh.Dial("tcp", addr, sshConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial: %s", err)
