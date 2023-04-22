@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -10,7 +9,14 @@ import (
 	"net/url"
 	"os"
 	"time"
+
+	"github.com/pkg/errors"
 )
+
+type SynologyClient struct {
+	ConnInfo *ConnectionInfo
+	SessID   string
+}
 
 type FileListResponse struct {
 	Data struct {
@@ -36,18 +42,32 @@ type ErrorResponse struct {
 	Message string `json:"message"`
 }
 
-func GetSessionID(ip, port, username, password string) (string, error) {
+func NewSynologyClient(info *ConnectionInfo) (*SynologyClient, error) {
+	sid, err := newSessionID(info)
+	if err != nil {
+		return nil, errors.Wrap(err, "fail to get new session id")
+	}
+
+	synoClient := &SynologyClient{
+		ConnInfo: info,
+		SessID:   sid,
+	}
+
+	return synoClient, nil
+}
+
+func newSessionID(info *ConnectionInfo) (string, error) {
 	// File Station API 인증 정보
 	apiInfo := url.Values{}
 	apiInfo.Set("api", "SYNO.API.Auth")
 	apiInfo.Set("version", "6")
 	apiInfo.Set("method", "login")
-	apiInfo.Set("account", username)
-	apiInfo.Set("passwd", password)
+	apiInfo.Set("account", info.Username)
+	apiInfo.Set("passwd", info.Password)
 	apiInfo.Set("session", "FileStation")
 
 	// 인증 API 호출
-	synoURL := fmt.Sprintf("http://%s:%s/webapi/auth.cgi?%s", ip, port, apiInfo.Encode())
+	synoURL := fmt.Sprintf("http://%s:%s/webapi/auth.cgi?%s", info.IP, info.Port, apiInfo.Encode())
 	resp, err := http.Get(synoURL)
 	if err != nil {
 		return "", fmt.Errorf("fail to get %s url: %v", synoURL, err)
@@ -82,17 +102,17 @@ func GetSessionID(ip, port, username, password string) (string, error) {
 	return authResponse.Data.Sid, nil
 }
 
-func GetFileList(ip, port, sid, folderPath string) (*FileListResponse, error) {
+func (client *SynologyClient) GetFileList(folderPath string) (*FileListResponse, error) {
 	// FileStation.List API 호출
 	listInfo := url.Values{}
 	listInfo.Set("api", "SYNO.FileStation.List")
 	listInfo.Set("version", "1")
 	listInfo.Set("method", "list")
 	listInfo.Set("folder_path", folderPath)
-	listInfo.Set("_sid", sid)
+	listInfo.Set("_sid", client.SessID)
 	listInfo.Set("additional", "size")
 
-	synoURL := fmt.Sprintf("http://%s:%s/webapi/entry.cgi?%s", ip, port, listInfo.Encode())
+	synoURL := fmt.Sprintf("http://%s:%s/webapi/entry.cgi?%s", client.ConnInfo.IP, client.ConnInfo.Port, listInfo.Encode())
 	resp, err := http.Get(synoURL)
 	if err != nil {
 		return nil, fmt.Errorf("fail to get %s url: %v", synoURL, err)
@@ -121,16 +141,16 @@ func GetFileList(ip, port, sid, folderPath string) (*FileListResponse, error) {
 	return fileListResponse, nil
 }
 
-func DownloadFile(ip, port, sid, filePath, destPath string) (string, int64, error) {
+func (client *SynologyClient) DownloadFile(filePath, destPath string) (string, int64, error) {
 	// FileStation.Download API 호출
 	downloadInfo := url.Values{}
 	downloadInfo.Set("api", "SYNO.FileStation.Download")
 	downloadInfo.Set("version", "1")
 	downloadInfo.Set("method", "download")
 	downloadInfo.Set("path", filePath)
-	downloadInfo.Set("_sid", sid)
+	downloadInfo.Set("_sid", client.SessID)
 
-	synoURL := fmt.Sprintf("http://%s:%s/webapi/entry.cgi?%s", ip, port, downloadInfo.Encode())
+	synoURL := fmt.Sprintf("http://%s:%s/webapi/entry.cgi?%s", client.ConnInfo.IP, client.ConnInfo.Port, downloadInfo.Encode())
 	resp, err := http.Get(synoURL)
 	if err != nil {
 		return "", 0, fmt.Errorf("fail to get %s url: %v", synoURL, err)

@@ -101,12 +101,6 @@ func main() {
 		log.Fatalf("fail to verify flag: %v", err)
 	}
 
-	// session id 가져오기
-	sid, err := protocol.GetSessionID(synoIP, synoPort, synoUsername, synoPassword)
-	if err != nil {
-		log.Fatalf("fail to get session id: %v", err)
-	}
-
 	// 디운로드 file list 생성
 	f, err := os.Create(resultPath)
 	if err != nil {
@@ -138,6 +132,12 @@ func main() {
 	defer ticker.Stop()
 
 	// 연결 정보 설정
+	synologyInfo := &protocol.ConnectionInfo{
+		IP:       synoIP,
+		Port:     synoPort,
+		Username: synoUsername,
+		Password: synoPassword,
+	}
 	remoteInfo := &protocol.ConnectionInfo{
 		IP:       remoteIP,
 		Port:     remotePort,
@@ -147,7 +147,7 @@ func main() {
 
 	for ; true; <-ticker.C {
 		// FileStation.List API 호출
-		downloadSynology(synoIP, synoPort, sid)
+		downloadSynology(synologyInfo)
 
 		// 파일 전송
 		uploadRemote(remoteInfo)
@@ -196,19 +196,4 @@ func verifyFlag(
 	}
 
 	return nil
-}
-
-func printProgress(title string, stop <-chan int) {
-	ticker := time.NewTicker(delay)
-	defer ticker.Stop()
-
-	log.Print(title)
-	for {
-		select {
-		case <-stop:
-			return
-		case <-ticker.C:
-			log.Printf("%07d MBytes", sumOfSize/1024/1024)
-		}
-	}
 }
