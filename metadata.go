@@ -26,6 +26,10 @@ const (
 var mu sync.Mutex
 
 func ReadMetadata(folderPath string) (map[string]FileMetadata, error) {
+	// 크리티컬 섹션 설정
+	mu.Lock()
+	defer mu.Unlock()
+
 	// metadata.yaml 파일 경로 생성
 	metadataFilePath := filepath.Join(folderPath, "metadata.yaml")
 
