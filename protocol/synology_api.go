@@ -48,12 +48,10 @@ func NewSynologyClient(info *ConnectionInfo) (*SynologyClient, error) {
 		return nil, errors.Wrap(err, "fail to get new session id")
 	}
 
-	synoClient := &SynologyClient{
+	return &SynologyClient{
 		ConnInfo: info,
 		SessID:   sid,
-	}
-
-	return synoClient, nil
+	}, nil
 }
 
 func newSessionID(info *ConnectionInfo) (string, error) {

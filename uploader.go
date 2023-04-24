@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/lolgopher/synology-filesync/protocol"
-	"github.com/pkg/sftp"
+	"github.com/pkg/errors"
 	"log"
 	"os"
 	"path/filepath"
@@ -39,7 +39,7 @@ func uploadRemote(info *protocol.ConnectionInfo) {
 	log.Print("Done!")
 }
 
-func searchLocal(client *sftp.Client, folderPath string) error {
+func searchLocal(sftp *protocol.SFTPClient, folderPath string) error {
 	// 파일 시스템에서 파일 검색
 	err := filepath.Walk(folderPath, func(targetPath string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -61,11 +61,20 @@ func searchLocal(client *sftp.Client, folderPath string) error {
 			size := 0
 			for {
 				// 파일 전송
-				size, err = protocol.SendFileOverSFTP(client, targetPath, filepath.Join(remotePath, strings.ReplaceAll(targetPath, localPath, "")))
+				size, err = sftp.SendFileOverSFTP(targetPath, filepath.Join(remotePath, strings.ReplaceAll(targetPath, localPath, "")))
 				if err != nil {
 					log.Printf("fail to %s send file over sftp: %v", targetPath, err)
 					log.Printf("retrying...")
 					time.Sleep(delay / 5)
+
+					if errors.Cause(err).Error() == "connection lost" {
+						// ssh client 재생성
+						sftp, err = protocol.NewSFTPClient(sftp.ConnInfo)
+						if err != nil {
+							log.Fatalf("fail to make srtp client: %v", err)
+						}
+					}
+
 					continue
 				} else {
 					log.Printf("%s: %d", targetPath, size)
