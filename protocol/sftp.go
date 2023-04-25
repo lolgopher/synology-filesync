@@ -45,7 +45,7 @@ func NewSFTPClient(info *ConnectionInfo) (*SFTPClient, error) {
 	}, nil
 }
 
-func (sftp *SFTPClient) SendFileOverSFTP(localFilePath, remoteFilePath string) (int, error) {
+func (sftp *SFTPClient) SendFile(localFilePath, remoteFilePath string) (int, error) {
 	// 원격지에서 해당 파일이 이미 존재하는지 확인
 	remoteFile, err := sftp.Client.Stat(remoteFilePath)
 	if err == nil {

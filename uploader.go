@@ -60,8 +60,11 @@ func searchLocal(sftp *protocol.SFTPClient, folderPath string) error {
 
 			size := 0
 			for {
+				destPath, _ := strings.CutPrefix(targetPath, localPath)
+				destPath = filepath.Join(remotePath, destPath)
+
 				// 파일 전송
-				size, err = sftp.SendFileOverSFTP(targetPath, filepath.Join(remotePath, strings.ReplaceAll(targetPath, localPath, "")))
+				size, err = sftp.SendFile(targetPath, destPath)
 				if err != nil {
 					log.Printf("fail to %s send file over sftp: %v", targetPath, err)
 					log.Printf("retrying...")
