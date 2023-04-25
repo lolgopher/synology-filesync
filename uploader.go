@@ -67,17 +67,23 @@ func searchLocal(sftp *protocol.SFTPClient, folderPath string) error {
 				size, err = sftp.SendFile(targetPath, destPath)
 				if err != nil {
 					log.Printf("fail to %s send file over sftp: %v", targetPath, err)
-					log.Printf("retrying...")
-					time.Sleep(delay / 5)
 
-					if errors.Cause(err).Error() == "connection lost" {
+					errStr := errors.Cause(err).Error()
+					if strings.Contains(errStr, "connection lost") {
 						// ssh client 재생성
 						sftp, err = protocol.NewSFTPClient(sftp.ConnInfo)
 						if err != nil {
 							log.Fatalf("fail to make srtp client: %v", err)
 						}
+					} else if strings.Contains(errStr, "already exist") {
+						// 기존 파일 삭제
+						if err := sftp.RemoveFile(destPath); err != nil {
+							log.Printf("fail to remove %s remote file: %v", destPath, err)
+						}
 					}
 
+					log.Printf("retrying...")
+					time.Sleep(delay / 5)
 					continue
 				} else {
 					log.Printf("%s: %d", targetPath, size)

@@ -104,6 +104,10 @@ func (sftp *SFTPClient) SendFile(localFilePath, remoteFilePath string) (int, err
 	return size, nil
 }
 
+func (sftp *SFTPClient) RemoveFile(targetFilePath string) error {
+	return sftp.Client.Remove(targetFilePath)
+}
+
 func (sftp *SFTPClient) Close() error {
 	return sftp.Client.Close()
 }
