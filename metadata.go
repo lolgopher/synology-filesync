@@ -18,9 +18,10 @@ type FileMetadata struct {
 type FileTransferStatus string
 
 const (
-	Init    FileTransferStatus = "INIT"
-	NotSent FileTransferStatus = "NOT_SENT"
-	Sent    FileTransferStatus = "SENT"
+	Init    = FileTransferStatus("INIT")
+	NotSent = FileTransferStatus("NOT_SENT")
+	Sent    = FileTransferStatus("SENT")
+	Failed  = FileTransferStatus("FAILED")
 )
 
 var mu sync.Mutex
