@@ -49,7 +49,7 @@ func searchLocal(sftp *protocol.SFTPClient, folderPath string) error {
 
 		if !info.IsDir() && info.Name() != "metadata.yaml" {
 			// 전송에 성공했는지 확인
-			targetMetadata, err := ReadMetadata(filepath.Dir(targetPath))
+			targetMetadata, err := protocol.ReadMetadata(filepath.Dir(targetPath))
 			if err != nil {
 				return err
 			}
@@ -59,17 +59,17 @@ func searchLocal(sftp *protocol.SFTPClient, folderPath string) error {
 				return fmt.Errorf("fail to find %s in metadata", targetPath)
 			}
 
-			switch FileTransferStatus(metadata.Status) {
-			case Init:
+			switch protocol.FileTransferStatus(metadata.Status) {
+			case protocol.Init:
 				log.Printf("%s is init metadata status", targetPath)
 				return nil
-			case Sent:
+			case protocol.Sent:
 				log.Printf("%s has already been sent", targetPath)
 				return nil
-			case Failed:
+			case protocol.Failed:
 				log.Printf("%s sent failed", targetPath)
 				return nil
-			case NotSent:
+			case protocol.NotSent:
 				size := 0
 				for i := 0; i < retryCount; i++ {
 					destPath, _ := strings.CutPrefix(targetPath, localPath)
@@ -103,15 +103,15 @@ func searchLocal(sftp *protocol.SFTPClient, folderPath string) error {
 					}
 				}
 
-				var result FileTransferStatus
+				var result protocol.FileTransferStatus
 				if size > 0 {
 					// 전송에 성공했을때
-					result = Sent
+					result = protocol.Sent
 				} else {
 					// 전송에 실패했을때
-					result = Failed
+					result = protocol.Failed
 				}
-				if err := WriteMetadata(targetPath, 0, result); err != nil {
+				if err := protocol.WriteMetadata(targetPath, 0, result); err != nil {
 					return err
 				}
 				time.Sleep(delay)
