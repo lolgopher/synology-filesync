@@ -70,38 +70,7 @@ func searchLocal(sftp *protocol.SFTPClient, folderPath string) error {
 				log.Printf("%s sent failed", targetPath)
 				return nil
 			case protocol.NotSent:
-				size := 0
-				for i := 0; i < retryCount; i++ {
-					destPath, _ := strings.CutPrefix(targetPath, localPath)
-					destPath = filepath.Join(remotePath, destPath)
-
-					// 파일 전송
-					size, err = sftp.SendFile(targetPath, destPath)
-					if err != nil {
-						log.Printf("fail to %s send file over sftp: %v", targetPath, err)
-
-						errStr := errors.Cause(err).Error()
-						if strings.Contains(errStr, "connection lost") ||
-							strings.Contains(errStr, "no route to host") {
-							// ssh client 재생성
-							sftp, err = protocol.NewSFTPClient(sftp.ConnInfo)
-							if err != nil {
-								log.Fatalf("fail to make sftp client: %v", err)
-							}
-						} else if strings.Contains(errStr, "already exist") {
-							// 기존 파일 삭제
-							if err := sftp.RemoveFile(destPath); err != nil {
-								log.Printf("fail to remove %s remote file: %v", destPath, err)
-							}
-						}
-
-						log.Printf("retrying...")
-						time.Sleep(delay / 5)
-					} else {
-						log.Printf("%s: %d", targetPath, size)
-						break
-					}
-				}
+				size := sendFileOverSFTP(sftp, targetPath)
 
 				var result protocol.FileTransferStatus
 				if size > 0 {
@@ -125,4 +94,41 @@ func searchLocal(sftp *protocol.SFTPClient, folderPath string) error {
 	})
 
 	return err
+}
+
+func sendFileOverSFTP(sftp *protocol.SFTPClient, targetPath string) int {
+	size := 0
+	for i := 0; i < retryCount; i++ {
+		destPath, _ := strings.CutPrefix(targetPath, localPath)
+		destPath = filepath.Join(remotePath, destPath)
+
+		// 파일 전송
+		size, err := sftp.SendFile(targetPath, destPath)
+		if err != nil {
+			log.Printf("fail to %s send file over sftp: %v", targetPath, err)
+
+			errStr := errors.Cause(err).Error()
+			if strings.Contains(errStr, "connection lost") ||
+				strings.Contains(errStr, "no route to host") {
+				// ssh client 재생성
+				sftp, err = protocol.NewSFTPClient(sftp.ConnInfo)
+				if err != nil {
+					log.Fatalf("fail to make sftp client: %v", err)
+				}
+			} else if strings.Contains(errStr, "already exist") {
+				// 기존 파일 삭제
+				if err := sftp.RemoveFile(destPath); err != nil {
+					log.Printf("fail to remove %s remote file: %v", destPath, err)
+				}
+			}
+
+			log.Printf("retrying...")
+			time.Sleep(delay / 5)
+		} else {
+			log.Printf("%s: %d", targetPath, size)
+			break
+		}
+	}
+
+	return size
 }

@@ -23,12 +23,11 @@ func GetFailedStatus(folderPath string) (map[string]metadata.FileMetadata, error
 }
 
 func searchMetadata(folderPath string, status metadata.FileTransferStatus) (map[string]metadata.FileMetadata, error) {
-	var result map[string]metadata.FileMetadata
+	result := make(map[string]metadata.FileMetadata)
 
 	err := filepath.Walk(folderPath, func(targetPath string, info os.FileInfo, err error) error {
 		if info.IsDir() {
-			data, err := metadata.ReadMetadata(targetPath)
-			if err == nil {
+			if data, err := metadata.ReadMetadata(targetPath); err == nil {
 				for key, value := range data {
 					if value.Status == string(status) {
 						result[key] = value
