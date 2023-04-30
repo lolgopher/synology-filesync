@@ -48,12 +48,10 @@ func NewSynologyClient(info *ConnectionInfo) (*SynologyClient, error) {
 		return nil, errors.Wrap(err, "fail to get new session id")
 	}
 
-	synoClient := &SynologyClient{
+	return &SynologyClient{
 		ConnInfo: info,
 		SessID:   sid,
-	}
-
-	return synoClient, nil
+	}, nil
 }
 
 func newSessionID(info *ConnectionInfo) (string, error) {
@@ -132,6 +130,7 @@ func (client *SynologyClient) GetFileList(folderPath string) (*FileListResponse,
 	fileListResponse := &FileListResponse{}
 	err = json.Unmarshal(body, fileListResponse)
 	if err != nil {
+		log.Printf("error to unmarshal body data: %s", string(body))
 		return nil, fmt.Errorf("fail to unmarshal %s response body: %v", synoURL, err)
 	}
 

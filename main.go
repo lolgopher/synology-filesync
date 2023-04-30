@@ -21,6 +21,7 @@ import (
 const (
 	programName = "synology-filesync"
 
+	retryCount    = 10
 	delay         = 10 * time.Second
 	downloadCycle = 12 * time.Hour
 	resultPath    = "./synology_files.txt"

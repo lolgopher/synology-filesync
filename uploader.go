@@ -1,8 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"github.com/lolgopher/synology-filesync/protocol"
-	"github.com/pkg/sftp"
+	"github.com/pkg/errors"
 	"log"
 	"os"
 	"path/filepath"
@@ -39,7 +40,7 @@ func uploadRemote(info *protocol.ConnectionInfo) {
 	log.Print("Done!")
 }
 
-func searchLocal(client *sftp.Client, folderPath string) error {
+func searchLocal(sftp *protocol.SFTPClient, folderPath string) error {
 	// 파일 시스템에서 파일 검색
 	err := filepath.Walk(folderPath, func(targetPath string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -53,32 +54,70 @@ func searchLocal(client *sftp.Client, folderPath string) error {
 				return err
 			}
 
-			if metadata, ok := targetMetadata[targetPath]; ok && metadata.Status == string(Sent) {
+			metadata, ok := targetMetadata[targetPath]
+			if !ok {
+				return fmt.Errorf("fail to find %s in metadata", targetPath)
+			}
+
+			switch FileTransferStatus(metadata.Status) {
+			case Init:
+				log.Printf("%s is init metadata status", targetPath)
+				return nil
+			case Sent:
 				log.Printf("%s has already been sent", targetPath)
 				return nil
-			}
+			case Failed:
+				log.Printf("%s sent failed", targetPath)
+				return nil
+			case NotSent:
+				size := 0
+				for i := 0; i < retryCount; i++ {
+					destPath, _ := strings.CutPrefix(targetPath, localPath)
+					destPath = filepath.Join(remotePath, destPath)
 
-			size := 0
-			for {
-				// 파일 전송
-				size, err = protocol.SendFileOverSFTP(client, targetPath, filepath.Join(remotePath, strings.ReplaceAll(targetPath, localPath, "")))
-				if err != nil {
-					log.Printf("fail to %s send file over sftp: %v", targetPath, err)
-					log.Printf("retrying...")
-					time.Sleep(delay / 5)
-					continue
-				} else {
-					log.Printf("%s: %d", targetPath, size)
-					break
+					// 파일 전송
+					size, err = sftp.SendFile(targetPath, destPath)
+					if err != nil {
+						log.Printf("fail to %s send file over sftp: %v", targetPath, err)
+
+						errStr := errors.Cause(err).Error()
+						if strings.Contains(errStr, "connection lost") ||
+							strings.Contains(errStr, "no route to host") {
+							// ssh client 재생성
+							sftp, err = protocol.NewSFTPClient(sftp.ConnInfo)
+							if err != nil {
+								log.Fatalf("fail to make sftp client: %v", err)
+							}
+						} else if strings.Contains(errStr, "already exist") {
+							// 기존 파일 삭제
+							if err := sftp.RemoveFile(destPath); err != nil {
+								log.Printf("fail to remove %s remote file: %v", destPath, err)
+							}
+						}
+
+						log.Printf("retrying...")
+						time.Sleep(delay / 5)
+					} else {
+						log.Printf("%s: %d", targetPath, size)
+						break
+					}
 				}
-			}
 
-			if size > 0 {
-				// 전송에 성공했다면 메타데이터 파일 업데이트
-				if err := WriteMetadata(targetPath, 0, Sent); err != nil {
+				var result FileTransferStatus
+				if size > 0 {
+					// 전송에 성공했을때
+					result = Sent
+				} else {
+					// 전송에 실패했을때
+					result = Failed
+				}
+				if err := WriteMetadata(targetPath, 0, result); err != nil {
 					return err
 				}
 				time.Sleep(delay)
+			default:
+				log.Printf("%s is unknown status", metadata.Status)
+				return nil
 			}
 		}
 

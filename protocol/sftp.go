@@ -11,7 +11,12 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func NewSFTPClient(info *ConnectionInfo) (*sftp.Client, error) {
+type SFTPClient struct {
+	ConnInfo *ConnectionInfo
+	Client   *sftp.Client
+}
+
+func NewSFTPClient(info *ConnectionInfo) (*SFTPClient, error) {
 	// SSH 연결 정보 설정
 	sshConfig := &ssh.ClientConfig{
 		User: info.Username,
@@ -34,12 +39,15 @@ func NewSFTPClient(info *ConnectionInfo) (*sftp.Client, error) {
 		return nil, fmt.Errorf("failed to create SFTP client: %s", err)
 	}
 
-	return sftpClient, nil
+	return &SFTPClient{
+		ConnInfo: info,
+		Client:   sftpClient,
+	}, nil
 }
 
-func SendFileOverSFTP(client *sftp.Client, localFilePath, remoteFilePath string) (int, error) {
+func (sftp *SFTPClient) SendFile(localFilePath, remoteFilePath string) (int, error) {
 	// 원격지에서 해당 파일이 이미 존재하는지 확인
-	remoteFile, err := client.Stat(remoteFilePath)
+	remoteFile, err := sftp.Client.Stat(remoteFilePath)
 	if err == nil {
 		isSame, err := IsSameFileSize(localFilePath, remoteFile)
 		if err != nil {
@@ -71,14 +79,14 @@ func SendFileOverSFTP(client *sftp.Client, localFilePath, remoteFilePath string)
 
 	// 경로 생성
 	dir := filepath.Dir(remoteFilePath)
-	if _, err := client.Stat(dir); os.IsNotExist(err) {
-		if err := client.MkdirAll(dir); err != nil {
+	if _, err := sftp.Client.Stat(dir); os.IsNotExist(err) {
+		if err := sftp.Client.MkdirAll(dir); err != nil {
 			return 0, fmt.Errorf("failed to create remote dir: %s", err)
 		}
 	}
 
 	// 파일 전송
-	newFile, err := client.OpenFile(remoteFilePath, os.O_CREATE|os.O_WRONLY|os.O_EXCL)
+	newFile, err := sftp.Client.OpenFile(remoteFilePath, os.O_CREATE|os.O_WRONLY|os.O_EXCL)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create remote file: %s", err)
 	}
@@ -94,4 +102,12 @@ func SendFileOverSFTP(client *sftp.Client, localFilePath, remoteFilePath string)
 	}
 
 	return size, nil
+}
+
+func (sftp *SFTPClient) RemoveFile(targetFilePath string) error {
+	return sftp.Client.Remove(targetFilePath)
+}
+
+func (sftp *SFTPClient) Close() error {
+	return sftp.Client.Close()
 }

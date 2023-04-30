@@ -6,8 +6,8 @@ ENV CGO_ENABLED=0 \
     BUILD_TIME="unknown" \
     GIT_HASH="unknown"
 
-RUN apt update -y
-RUN apt install -y upx
+RUN apt-get update -y
+RUN apt-get install -y upx
 
 WORKDIR /build
 COPY . ./
