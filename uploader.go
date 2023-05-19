@@ -115,13 +115,12 @@ func sendFileOverSFTP(sftp *protocol.SFTPClient, targetPath string) int {
 				if err != nil {
 					log.Fatalf("fail to make sftp client: %v", err)
 				}
-			} else if strings.Contains(errStr, "already exist") {
-				// 기존 파일 삭제
-				if err := sftp.RemoveFile(destPath); err != nil {
-					log.Printf("fail to remove %s remote file: %v", destPath, err)
-				}
 			}
 
+			// 기존 파일 삭제
+			if err := sftp.RemoveFile(destPath); err != nil {
+				log.Printf("fail to remove %s remote file: %v", destPath, err)
+			}
 			log.Printf("retrying...")
 			time.Sleep(delay / 5)
 		} else {
