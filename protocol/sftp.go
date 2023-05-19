@@ -45,9 +45,9 @@ func NewSFTPClient(info *ConnectionInfo) (*SFTPClient, error) {
 	}, nil
 }
 
-func (sftp *SFTPClient) SendFile(localFilePath, remoteFilePath string) (int, error) {
+func (sc *SFTPClient) SendFile(localFilePath, remoteFilePath string) (int, error) {
 	// 원격지에서 해당 파일이 이미 존재하는지 확인
-	remoteFile, err := sftp.Client.Stat(remoteFilePath)
+	remoteFile, err := sc.Client.Stat(remoteFilePath)
 	if err == nil {
 		isSame, err := IsSameFileSize(localFilePath, remoteFile)
 		if err != nil {
@@ -79,14 +79,14 @@ func (sftp *SFTPClient) SendFile(localFilePath, remoteFilePath string) (int, err
 
 	// 경로 생성
 	dir := filepath.Dir(remoteFilePath)
-	if _, err := sftp.Client.Stat(dir); os.IsNotExist(err) {
-		if err := sftp.Client.MkdirAll(dir); err != nil {
+	if _, err := sc.Client.Stat(dir); os.IsNotExist(err) {
+		if err := sc.Client.MkdirAll(dir); err != nil {
 			return 0, fmt.Errorf("failed to create remote dir: %s", err)
 		}
 	}
 
 	// 파일 전송
-	newFile, err := sftp.Client.OpenFile(remoteFilePath, os.O_CREATE|os.O_WRONLY|os.O_EXCL)
+	newFile, err := sc.Client.OpenFile(remoteFilePath, os.O_CREATE|os.O_WRONLY|os.O_EXCL)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create remote file: %s", err)
 	}
@@ -104,10 +104,10 @@ func (sftp *SFTPClient) SendFile(localFilePath, remoteFilePath string) (int, err
 	return size, nil
 }
 
-func (sftp *SFTPClient) RemoveFile(targetFilePath string) error {
-	return sftp.Client.Remove(targetFilePath)
+func (sc *SFTPClient) RemoveFile(targetFilePath string) error {
+	return sc.Client.Remove(targetFilePath)
 }
 
-func (sftp *SFTPClient) Close() error {
-	return sftp.Client.Close()
+func (sc *SFTPClient) Close() error {
+	return sc.Client.Close()
 }
