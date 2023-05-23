@@ -6,7 +6,7 @@ ENV CGO_ENABLED=0 \
     BUILD_TIME="unknown" \
     GIT_HASH="unknown"
 
-RUN apt-get update -y
+# RUN apt-get update -y
 # RUN apt-get install -y upx
 
 WORKDIR /build
