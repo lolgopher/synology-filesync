@@ -7,7 +7,7 @@ ENV CGO_ENABLED=0 \
     GIT_HASH="unknown"
 
 RUN apt-get update -y
-RUN apt-get install -y upx
+# RUN apt-get install -y upx
 
 WORKDIR /build
 COPY . ./
@@ -24,7 +24,7 @@ RUN if [ "$BUILD_TAG" = "unknown" ]; then export BUILD_TAG=dev; fi \
     && go build -a -ldflags "${LDFLAGS}" -o app .
 
 RUN strip /build/app
-RUN upx -q -9 /build/app
+# RUN upx -q -9 /build/app
 
 # ---
 FROM alpine
