@@ -21,6 +21,7 @@ import (
 const (
 	programName = "synology-filesync"
 
+	spareSpace    = 1073741824 // 1GByte
 	retryCount    = 10
 	delay         = 10 * time.Second
 	downloadCycle = 12 * time.Hour
