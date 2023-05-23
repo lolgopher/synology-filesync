@@ -71,7 +71,7 @@ func WriteMetadata(filePath string, size uint64, status FileTransferStatus) erro
 
 	// 메타데이터 맵 생성 또는 업데이트
 	metadata := make(map[string]FileMetadata)
-	if err := yaml.Unmarshal(data, &metadata); err != nil && !os.IsNotExist(err) {
+	if err := yaml.Unmarshal(data, &metadata); err != nil {
 		log.Printf("error to unmarshal write data: %s", string(data))
 		return fmt.Errorf("fail to unmarshal %s metadata file: %v", metadataFilePath, err)
 	}

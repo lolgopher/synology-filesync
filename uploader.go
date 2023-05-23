@@ -102,6 +102,27 @@ func sendFileOverSFTP(sftp *protocol.SFTPClient, targetPath string) int {
 		destPath, _ := strings.CutPrefix(targetPath, localPath)
 		destPath = filepath.Join(remotePath, destPath)
 
+		// 용량 확인
+		targetFileInfo, err := os.Stat(targetPath)
+		if err != nil {
+			log.Printf("fail to get %s file info: %v", targetFileInfo, err)
+		}
+		stat, err := sftp.Client.StatVFS("/storage/emulated")
+		if err != nil {
+			log.Printf("fail to get storage directory information: %v", err)
+		}
+		if targetFileInfo != nil && stat != nil {
+			if targetSize, freeSize := uint64(targetFileInfo.Size()), stat.FreeSpace(); targetSize+spareSpace > freeSize {
+				log.Printf("not enough space (\n"+
+					"\ttarget file size: %d\n"+
+					"\tfree space: %d\n"+
+					"\tspare space: %d\n)", targetSize, freeSize, spareSpace)
+				log.Printf("retrying...")
+				time.Sleep(delay * 600)
+				continue
+			}
+		}
+
 		// 파일 전송
 		size, err := sftp.SendFile(targetPath, destPath)
 		if err != nil {
@@ -115,13 +136,12 @@ func sendFileOverSFTP(sftp *protocol.SFTPClient, targetPath string) int {
 				if err != nil {
 					log.Fatalf("fail to make sftp client: %v", err)
 				}
-			} else if strings.Contains(errStr, "already exist") {
-				// 기존 파일 삭제
-				if err := sftp.RemoveFile(destPath); err != nil {
-					log.Printf("fail to remove %s remote file: %v", destPath, err)
-				}
 			}
 
+			// 기존 파일 삭제
+			if err := sftp.RemoveFile(destPath); err != nil {
+				log.Printf("fail to remove %s remote file: %v", destPath, err)
+			}
 			log.Printf("retrying...")
 			time.Sleep(delay / 5)
 		} else {
