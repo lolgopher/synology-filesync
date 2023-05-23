@@ -119,7 +119,7 @@ func downloadSynologyRecursive(client *protocol.SynologyClient, fileList *protoc
 			// 파일이면 다운로드
 			for {
 				if err := sem.Acquire(ctx, 1); err != nil {
-					log.Printf("failed to acquire semaphore: %v", err)
+					log.Printf("fail to acquire semaphore: %v", err)
 					continue
 				} else {
 					break
