@@ -70,7 +70,7 @@ func searchLocal(sftp *protocol.SFTPClient, folderPath string) error {
 				log.Printf("%s sent failed", targetPath)
 				return nil
 			case protocol.NotSent:
-				size := sendFileOverSFTP(sftp, targetPath)
+				size := sendFileOverSFTP(&sftp, targetPath)
 
 				var result protocol.FileTransferStatus
 				if size > 0 {
@@ -96,7 +96,7 @@ func searchLocal(sftp *protocol.SFTPClient, folderPath string) error {
 	return err
 }
 
-func sendFileOverSFTP(sftp *protocol.SFTPClient, targetPath string) int {
+func sendFileOverSFTP(sftp **protocol.SFTPClient, targetPath string) int {
 	size := 0
 	for i := 0; i < retryCount; i++ {
 		destPath, _ := strings.CutPrefix(targetPath, localPath)
@@ -107,7 +107,7 @@ func sendFileOverSFTP(sftp *protocol.SFTPClient, targetPath string) int {
 		if err != nil {
 			log.Printf("fail to get %s file info: %v", targetFileInfo, err)
 		}
-		stat, err := sftp.Client.StatVFS("/storage/emulated")
+		stat, err := (*sftp).Client.StatVFS("/storage/emulated")
 		if err != nil {
 			log.Printf("fail to get storage directory information: %v", err)
 		}
@@ -124,7 +124,7 @@ func sendFileOverSFTP(sftp *protocol.SFTPClient, targetPath string) int {
 		}
 
 		// 파일 전송
-		size, err := sftp.SendFile(targetPath, destPath)
+		size, err := (*sftp).SendFile(targetPath, destPath)
 		if err != nil {
 			log.Printf("fail to %s send file over sftp: %v", targetPath, err)
 
@@ -132,14 +132,16 @@ func sendFileOverSFTP(sftp *protocol.SFTPClient, targetPath string) int {
 			if strings.Contains(errStr, "connection lost") ||
 				strings.Contains(errStr, "no route to host") {
 				// ssh client 재생성
-				sftp, err = protocol.NewSFTPClient(sftp.ConnInfo)
+				newSFTP, err := protocol.NewSFTPClient((*sftp).ConnInfo)
 				if err != nil {
 					log.Fatalf("fail to make sftp client: %v", err)
+				} else {
+					sftp = &newSFTP
 				}
 			}
 
 			// 기존 파일 삭제
-			if err := sftp.RemoveFile(destPath); err != nil {
+			if err := (*sftp).RemoveFile(destPath); err != nil {
 				log.Printf("fail to remove %s remote file: %v", destPath, err)
 			}
 			log.Printf("retrying...")
