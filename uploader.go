@@ -124,7 +124,7 @@ func sendFileOverSFTP(sftp **protocol.SFTPClient, targetPath string) int {
 		}
 
 		// 파일 전송
-		size, err := (*sftp).SendFile(targetPath, destPath)
+		size, err = (*sftp).SendFile(targetPath, destPath)
 		if err != nil {
 			log.Printf("fail to %s send file over sftp: %v", targetPath, err)
 
