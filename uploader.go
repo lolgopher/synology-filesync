@@ -70,16 +70,21 @@ func searchLocal(sftp *protocol.SFTPClient, folderPath string) error {
 				log.Printf("%s sent failed", targetPath)
 				return nil
 			case protocol.NotSent:
-				size := sendFileOverSFTP(&sftp, targetPath)
-
 				var result protocol.FileTransferStatus
-				if size > 0 {
-					// 전송에 성공했을때
-					result = protocol.Sent
-				} else {
+				if size, err := sendFileOverSFTP(&sftp, targetPath); err != nil {
 					// 전송에 실패했을때
 					result = protocol.Failed
+					log.Printf("%v", err)
+				} else {
+					// 전송에 성공했을때
+					result = protocol.Sent
+
+					// 이미 전송되었다면
+					if size == 0 {
+						log.Printf("same size file %s already exist", targetPath)
+					}
 				}
+
 				if err := protocol.WriteMetadata(targetPath, 0, result); err != nil {
 					return err
 				}
@@ -96,7 +101,7 @@ func searchLocal(sftp *protocol.SFTPClient, folderPath string) error {
 	return err
 }
 
-func sendFileOverSFTP(sftp **protocol.SFTPClient, targetPath string) int {
+func sendFileOverSFTP(sftp **protocol.SFTPClient, targetPath string) (int, error) {
 	size := 0
 	for i := 0; i < retryCount; i++ {
 		destPath, _ := strings.CutPrefix(targetPath, localPath)
@@ -148,10 +153,12 @@ func sendFileOverSFTP(sftp **protocol.SFTPClient, targetPath string) int {
 			log.Printf("retrying...")
 			time.Sleep(delay / 5)
 		} else {
-			log.Printf("%s: %d", targetPath, size)
+			if size > 0 {
+				log.Printf("%s: %d", targetPath, size)
+			}
 			break
 		}
 	}
 
-	return size
+	return size, nil
 }
