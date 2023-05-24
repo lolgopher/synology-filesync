@@ -136,6 +136,7 @@ func sendFileOverSFTP(sftp **protocol.SFTPClient, targetPath string) int {
 				if err != nil {
 					log.Fatalf("fail to make sftp client: %v", err)
 				} else {
+					_ = (*sftp).Close()
 					sftp = &newSFTP
 				}
 			}
