@@ -26,7 +26,7 @@ func uploadRemote(info *protocol.ConnectionInfo) {
 		}
 		defer func() {
 			if err := client.Close(); err != nil {
-				log.Fatalf("fail to close sftp client: %v", err)
+				log.Printf("fail to close sftp client: %v", err)
 			}
 		}()
 
@@ -124,7 +124,7 @@ func sendFileOverSFTP(sftp **protocol.SFTPClient, targetPath string) int {
 		}
 
 		// 파일 전송
-		size, err := (*sftp).SendFile(targetPath, destPath)
+		size, err = (*sftp).SendFile(targetPath, destPath)
 		if err != nil {
 			log.Printf("fail to %s send file over sftp: %v", targetPath, err)
 
@@ -136,6 +136,7 @@ func sendFileOverSFTP(sftp **protocol.SFTPClient, targetPath string) int {
 				if err != nil {
 					log.Fatalf("fail to make sftp client: %v", err)
 				} else {
+					_ = (*sftp).Close()
 					sftp = &newSFTP
 				}
 			}
