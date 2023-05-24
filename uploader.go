@@ -26,7 +26,7 @@ func uploadRemote(info *protocol.ConnectionInfo) {
 		}
 		defer func() {
 			if err := client.Close(); err != nil {
-				log.Fatalf("fail to close sftp client: %v", err)
+				log.Printf("fail to close sftp client: %v", err)
 			}
 		}()
 
