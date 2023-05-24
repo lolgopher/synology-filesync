@@ -74,7 +74,7 @@ func searchLocal(sftp *protocol.SFTPClient, folderPath string) error {
 				if size, err := sendFileOverSFTP(&sftp, targetPath); err != nil {
 					// 전송에 실패했을때
 					result = protocol.Failed
-					log.Printf("%v", err)
+					log.Printf("fail to %s not sent file: %v", targetPath, err)
 				} else {
 					// 전송에 성공했을때
 					result = protocol.Sent
@@ -82,6 +82,8 @@ func searchLocal(sftp *protocol.SFTPClient, folderPath string) error {
 					// 이미 전송되었다면
 					if size == 0 {
 						log.Printf("same size file %s already exist", targetPath)
+					} else {
+						log.Printf("%s: %d", targetPath, size)
 					}
 				}
 
@@ -102,6 +104,7 @@ func searchLocal(sftp *protocol.SFTPClient, folderPath string) error {
 }
 
 func sendFileOverSFTP(sftp **protocol.SFTPClient, targetPath string) (int, error) {
+	var lastError error
 	size := 0
 	for i := 0; i < retryCount; i++ {
 		destPath, _ := strings.CutPrefix(targetPath, localPath)
@@ -110,18 +113,21 @@ func sendFileOverSFTP(sftp **protocol.SFTPClient, targetPath string) (int, error
 		// 용량 확인
 		targetFileInfo, err := os.Stat(targetPath)
 		if err != nil {
-			log.Printf("fail to get %s file info: %v", targetFileInfo, err)
+			lastError = fmt.Errorf("fail to get %s file info: %v", targetFileInfo, err)
+			log.Print(lastError.Error())
 		}
 		stat, err := (*sftp).Client.StatVFS("/storage/emulated")
 		if err != nil {
-			log.Printf("fail to get storage directory information: %v", err)
+			lastError = errors.Wrap(err, "fail to get storage directory information")
+			log.Print(lastError.Error())
 		}
 		if targetFileInfo != nil && stat != nil {
 			if targetSize, freeSize := uint64(targetFileInfo.Size()), stat.FreeSpace(); targetSize+spareSpace > freeSize {
-				log.Printf("not enough space (\n"+
+				lastError = fmt.Errorf("not enough space (\n"+
 					"\ttarget file size: %d\n"+
 					"\tfree space: %d\n"+
 					"\tspare space: %d\n)", targetSize, freeSize, spareSpace)
+				log.Printf(lastError.Error())
 				log.Printf("retrying...")
 				time.Sleep(delay * 600)
 				continue
@@ -131,7 +137,8 @@ func sendFileOverSFTP(sftp **protocol.SFTPClient, targetPath string) (int, error
 		// 파일 전송
 		size, err = (*sftp).SendFile(targetPath, destPath)
 		if err != nil {
-			log.Printf("fail to %s send file over sftp: %v", targetPath, err)
+			lastError = fmt.Errorf("fail to %s send file over sftp: %v", targetPath, err)
+			log.Print(lastError.Error())
 
 			errStr := errors.Cause(err).Error()
 			if strings.Contains(errStr, "connection lost") ||
@@ -153,12 +160,9 @@ func sendFileOverSFTP(sftp **protocol.SFTPClient, targetPath string) (int, error
 			log.Printf("retrying...")
 			time.Sleep(delay / 5)
 		} else {
-			if size > 0 {
-				log.Printf("%s: %d", targetPath, size)
-			}
 			break
 		}
 	}
 
-	return size, nil
+	return size, lastError
 }
