@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
 	"github.com/lolgopher/synology-filesync/protocol"
@@ -15,10 +14,7 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-const (
-	programName = "synology-filesync"
-	resultPath  = "./synology_files.txt"
-)
+const programName = "synology-filesync"
 
 var (
 	buildTag   = "unknown"
@@ -27,12 +23,8 @@ var (
 	programVer = fmt.Sprintf("%s-%s(%s)", buildTag, gitHash, buildStamp)
 
 	config *Config
-
-	writer    *bufio.Writer
-	sumOfSize int64
-
-	wg  sync.WaitGroup
-	sem = semaphore.NewWeighted(int64(config.downloadWorker))
+	wg     sync.WaitGroup
+	sem    = semaphore.NewWeighted(int64(config.downloadWorker))
 )
 
 func main() {
@@ -62,22 +54,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("fail to init config: %v", err)
 	}
-
-	// 디운로드 file list 생성
-	f, err := os.Create(resultPath)
-	if err != nil {
-		log.Fatalf("fail to create %s file: %v", resultPath, err)
-	}
-	defer func() {
-		if err := writer.Flush(); err != nil {
-			log.Print(err)
-		}
-
-		if err := f.Close(); err != nil {
-			log.Print(err)
-		}
-	}()
-	writer = bufio.NewWriter(f)
 
 	// Interrupt Signal 받기
 	go func() {

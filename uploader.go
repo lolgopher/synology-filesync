@@ -12,7 +12,6 @@ import (
 )
 
 func uploadRemote(info *protocol.ConnectionInfo) {
-	sumOfSize = 0
 	wg.Add(1)
 	go func() {
 		defer func() {

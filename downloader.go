@@ -6,9 +6,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
-	"sync/atomic"
-	"time"
 )
 
 func downloadSynology(info *protocol.ConnectionInfo) {
@@ -18,9 +15,6 @@ func downloadSynology(info *protocol.ConnectionInfo) {
 		log.Fatalf("fail to make synology client: %v", err)
 	}
 
-	stopChan := make(chan int, 1)
-
-	sumOfSize = 0
 	wg.Add(1)
 	go func() {
 		defer func() {
@@ -32,19 +26,12 @@ func downloadSynology(info *protocol.ConnectionInfo) {
 			log.Fatalf("fail to search from synology filestation: %v", err)
 		}
 
-		if err := writer.Flush(); err != nil {
-			log.Print(err)
-		}
-
 		if err := downloadSynologyRecursive(synoClient, fileListResp); err != nil {
 			log.Fatalf("fail to download from synology filestation: %v", err)
 		}
 	}()
-	go printProgress("Download...", stopChan)
 	wg.Wait()
-	stopChan <- 1
 
-	close(stopChan)
 	log.Print("Done!")
 }
 
@@ -55,8 +42,6 @@ func searchSynologyRecursive(client *protocol.SynologyClient, folderPath string,
 	}
 
 	for _, file := range fileListResp.Data.Files {
-		_, _ = writer.WriteString(strings.Repeat("\t", depth) + file.Name + "\n")
-
 		// 폴더이고 휴지통이 아니면 검색
 		if file.IsDir {
 			if file.Name != "#recycle" {
@@ -148,11 +133,10 @@ func downloadSynologyRecursive(client *protocol.SynologyClient, fileList *protoc
 					return
 				}
 
-				downloadFilePath, size, err := client.DownloadFile(filePath, targetPath)
+				downloadFilePath, _, err := client.DownloadFile(filePath, targetPath)
 				if err != nil {
 					log.Fatalf("fail to %s download file: %v", filePath, err)
 				}
-				atomic.AddInt64(&sumOfSize, size)
 
 				if err := protocol.WriteMetadata(downloadFilePath, 0, protocol.NotSent); err != nil {
 					log.Fatalf("fail to %s write metadata: %v", downloadFilePath, err)
@@ -162,19 +146,4 @@ func downloadSynologyRecursive(client *protocol.SynologyClient, fileList *protoc
 	}
 
 	return nil
-}
-
-func printProgress(title string, stop <-chan int) {
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
-
-	log.Print(title)
-	for {
-		select {
-		case <-stop:
-			return
-		case <-ticker.C:
-			log.Printf("%07d MBytes", sumOfSize/1024/1024)
-		}
-	}
 }
