@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 	"io"
 	"log"
 	"os"
@@ -30,13 +31,13 @@ func NewSFTPClient(info *ConnectionInfo) (*SFTPClient, error) {
 	addr := fmt.Sprintf("%s:%s", info.IP, info.Port)
 	sshClient, err := ssh.Dial("tcp", addr, sshConfig)
 	if err != nil {
-		return nil, fmt.Errorf("fail to dial: %v", err)
+		return nil, errors.Wrap(err, "fail to dial")
 	}
 
 	// SFTP 클라이언트 생성
 	sftpClient, err := sftp.NewClient(sshClient)
 	if err != nil {
-		return nil, fmt.Errorf("fail to create SFTP client: %v", err)
+		return nil, errors.Wrap(err, "fail to create SFTP client")
 	}
 
 	return &SFTPClient{
@@ -64,7 +65,7 @@ func (sc *SFTPClient) SendFile(localFilePath, remoteFilePath string) (int, error
 	// 파일 열기
 	localFile, err := os.Open(localFilePath)
 	if err != nil {
-		return 0, fmt.Errorf("fail to open local file: %v", err)
+		return 0, errors.Wrap(err, "fail to open local file")
 	}
 	defer func() {
 		if err := localFile.Close(); err != nil {
@@ -74,21 +75,21 @@ func (sc *SFTPClient) SendFile(localFilePath, remoteFilePath string) (int, error
 
 	localFileContent, err := io.ReadAll(localFile)
 	if err != nil {
-		return 0, fmt.Errorf("fail to read local file: %v", err)
+		return 0, errors.Wrap(err, "fail to read local file")
 	}
 
 	// 경로 생성
 	dir := filepath.Dir(remoteFilePath)
 	if _, err := sc.Client.Stat(dir); os.IsNotExist(err) {
 		if err := sc.Client.MkdirAll(dir); err != nil {
-			return 0, fmt.Errorf("fail to create remote dir: %v", err)
+			return 0, errors.Wrap(err, "fail to create remote dir")
 		}
 	}
 
 	// 파일 전송
 	newFile, err := sc.Client.OpenFile(remoteFilePath, os.O_CREATE|os.O_WRONLY|os.O_EXCL)
 	if err != nil {
-		return 0, fmt.Errorf("fail to create remote file: %v", err)
+		return 0, errors.Wrap(err, "fail to create remote file")
 	}
 	defer func() {
 		if err := newFile.Close(); err != nil {
@@ -98,7 +99,7 @@ func (sc *SFTPClient) SendFile(localFilePath, remoteFilePath string) (int, error
 
 	size, err := newFile.Write(localFileContent)
 	if err != nil {
-		return 0, fmt.Errorf("fail to write to remote file: %v", err)
+		return 0, errors.Wrap(err, "fail to write to remote file")
 	}
 
 	return size, nil
