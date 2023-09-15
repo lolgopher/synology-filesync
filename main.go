@@ -24,7 +24,7 @@ var (
 
 	config *Config
 	wg     sync.WaitGroup
-	sem    = semaphore.NewWeighted(int64(config.downloadWorker))
+	sem    *semaphore.Weighted
 )
 
 func main() {
@@ -54,6 +54,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("fail to init config: %v", err)
 	}
+	sem = semaphore.NewWeighted(int64(config.DownloadWorker))
 
 	// Interrupt Signal 받기
 	go func() {
