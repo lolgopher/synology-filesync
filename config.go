@@ -21,18 +21,17 @@ type Address struct {
 }
 
 type Config struct {
-	Synology   Address `yaml:"synology"`
-	Remote     Address `yaml:"remote"`
-	Local      Address `yaml:"local"`
-	spareSpace int     `yaml:"spare_space"`
-	syncCycle  int     `yaml:"sync_cycle"`
+	Synology       Address `yaml:"synology"`
+	Remote         Address `yaml:"remote"`
+	Local          Address `yaml:"local"`
+	spareSpace     uint64  `yaml:"spare_space"`
+	syncCycle      int     `yaml:"sync_cycle"`
+	downloadWorker int     `yaml:"download_worker"`
 
-	downloadWorker     int `yaml:"download_worker"`
 	downloadDelay      int `yaml:"download_delay"`
 	downloadRetryDelay int `yaml:"download_retry_delay"`
 	downloadRetryCount int `yaml:"download_retry_count"`
 
-	uploadWocker     int `yaml:"upload_wocker"`
 	uploadDelay      int `yaml:"upload_delay"`
 	uploadRetryDelay int `yaml:"upload_retry_delay"`
 	uploadRetryCount int `yaml:"upload_retry_count"`
@@ -58,15 +57,14 @@ var defaultConfig = Config{
 	Local: Address{
 		Path: "", // Local path to save download files (os.Getwd())
 	},
-	spareSpace: 1073741824, // 1GByte
-	syncCycle:  12,         // Hour
+	spareSpace:     1073741824, // 1GByte
+	syncCycle:      12,         // Hour
+	downloadWorker: runtime.GOMAXPROCS(0),
 
-	downloadWorker:     runtime.GOMAXPROCS(0),
 	downloadDelay:      10, // Second
 	downloadRetryDelay: 2,  // Second
 	downloadRetryCount: 10,
 
-	uploadWocker:     runtime.GOMAXPROCS(0),
 	uploadDelay:      10, // Second
 	uploadRetryDelay: 2,  // Second
 	uploadRetryCount: 10,

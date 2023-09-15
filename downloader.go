@@ -27,7 +27,7 @@ func downloadSynology(info *protocol.ConnectionInfo) {
 			wg.Done()
 		}()
 
-		fileListResp, err := searchSynologyRecursive(synoClient, synoPath, 0)
+		fileListResp, err := searchSynologyRecursive(synoClient, config.Synology.Path, 0)
 		if err != nil {
 			log.Fatalf("fail to search from synology filestation: %v", err)
 		}
@@ -60,7 +60,7 @@ func searchSynologyRecursive(client *protocol.SynologyClient, folderPath string,
 		// 폴더이고 휴지통이 아니면 검색
 		if file.IsDir {
 			if file.Name != "#recycle" {
-				if err := os.MkdirAll(filepath.Join(localPath, file.Path), os.ModePerm); err != nil {
+				if err := os.MkdirAll(filepath.Join(config.Local.Path, file.Path), os.ModePerm); err != nil {
 					log.Fatalf("fail to make download folder: %v", err)
 				}
 
@@ -70,7 +70,7 @@ func searchSynologyRecursive(client *protocol.SynologyClient, folderPath string,
 				}
 			}
 		} else {
-			initFilePath := filepath.Join(localPath, file.Path)
+			initFilePath := filepath.Join(config.Local.Path, file.Path)
 
 			// 메타데이터가 없으면 초기화
 			if !protocol.FileExists(filepath.Join(filepath.Dir(initFilePath), "metadata.yaml")) {
@@ -135,7 +135,7 @@ func downloadSynologyRecursive(client *protocol.SynologyClient, fileList *protoc
 					wg.Done()
 				}()
 
-				targetPath := filepath.Join(localPath, filePath)
+				targetPath := filepath.Join(config.Local.Path, filePath)
 
 				// 초기화 상태인지 확인
 				targetMetadata, err := protocol.ReadMetadata(filepath.Dir(targetPath))
@@ -165,7 +165,7 @@ func downloadSynologyRecursive(client *protocol.SynologyClient, fileList *protoc
 }
 
 func printProgress(title string, stop <-chan int) {
-	ticker := time.NewTicker(delay)
+	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
 	log.Print(title)
