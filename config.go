@@ -21,24 +21,24 @@ type Address struct {
 }
 
 type Config struct {
-	Synology       Address `yaml:"synology"`
-	Remote         Address `yaml:"remote"`
-	Local          Address `yaml:"local"`
-	spareSpace     uint64  `yaml:"spare_space"`
-	syncCycle      int     `yaml:"sync_cycle"`
-	downloadWorker int     `yaml:"download_worker"`
+	Synology       *Address `yaml:"synology,omitempty"`
+	Remote         *Address `yaml:"remote,omitempty"`
+	Local          *Address `yaml:"local,omitempty"`
+	SpareSpace     uint64   `yaml:"spare_space"`
+	SyncCycle      int      `yaml:"sync_cycle"`
+	DownloadWorker int      `yaml:"download_worker"`
 
-	downloadDelay      int `yaml:"download_delay"`
-	downloadRetryDelay int `yaml:"download_retry_delay"`
-	downloadRetryCount int `yaml:"download_retry_count"`
+	DownloadDelay      int `yaml:"download_delay"`
+	DownloadRetryDelay int `yaml:"download_retry_delay"`
+	DownloadRetryCount int `yaml:"download_retry_count"`
 
-	uploadDelay      int `yaml:"upload_delay"`
-	uploadRetryDelay int `yaml:"upload_retry_delay"`
-	uploadRetryCount int `yaml:"upload_retry_count"`
+	UploadDelay      int `yaml:"upload_delay"`
+	UploadRetryDelay int `yaml:"upload_retry_delay"`
+	UploadRetryCount int `yaml:"upload_retry_count"`
 }
 
-var defaultConfig = Config{
-	Synology: Address{
+var defaultConfig = &Config{
+	Synology: &Address{
 		IP:       "1.2.3.4", // FileStation IP address
 		Port:     "5001",    // FileStation port
 		Username: "admin",   // FileStation account username
@@ -46,7 +46,7 @@ var defaultConfig = Config{
 		Path:     "/photo",  // FileStation path to download files
 		IsSkip:   false,     // Skip Option
 	},
-	Remote: Address{
+	Remote: &Address{
 		IP:       "192.168.0.100", // Remote SSH IP address
 		Port:     "22",            // Remote SSH port
 		Username: "user",          // Remote SSH username
@@ -54,20 +54,20 @@ var defaultConfig = Config{
 		Path:     "/DCIM",         // Remote path to download files
 		IsSkip:   false,           // Skip Option
 	},
-	Local: Address{
+	Local: &Address{
 		Path: "", // Local path to save download files (os.Getwd())
 	},
-	spareSpace:     1073741824, // 1GByte
-	syncCycle:      12,         // Hour
-	downloadWorker: runtime.GOMAXPROCS(0),
+	SpareSpace:     1073741824, // 1GByte
+	SyncCycle:      12,         // Hour
+	DownloadWorker: runtime.GOMAXPROCS(0),
 
-	downloadDelay:      10, // Second
-	downloadRetryDelay: 2,  // Second
-	downloadRetryCount: 10,
+	DownloadDelay:      10, // Second
+	DownloadRetryDelay: 2,  // Second
+	DownloadRetryCount: 10,
 
-	uploadDelay:      10, // Second
-	uploadRetryDelay: 2,  // Second
-	uploadRetryCount: 10,
+	UploadDelay:      10, // Second
+	UploadRetryDelay: 2,  // Second
+	UploadRetryCount: 10,
 }
 
 const defaultConfigPath = "./config.yaml"
@@ -85,7 +85,7 @@ func initConfig(configPath string) (*Config, error) {
 		}
 
 		// YAML 언마샬링
-		if err := yaml.Unmarshal(data, result); err != nil {
+		if err := yaml.Unmarshal(data, &result); err != nil {
 			log.Printf("error to unmarshal read data: %s", string(data))
 			return nil, fmt.Errorf("fail to unmarshal %s config file: %v", configPath, err)
 		}

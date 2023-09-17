@@ -89,7 +89,7 @@ func searchLocal(sftp *protocol.SFTPClient, folderPath string) error {
 				if err := protocol.WriteMetadata(targetPath, 0, result); err != nil {
 					return err
 				}
-				time.Sleep(time.Duration(config.uploadDelay) * time.Second)
+				time.Sleep(time.Duration(config.UploadDelay) * time.Second)
 			default:
 				log.Printf("%s is unknown status", metadata.Status)
 				return nil
@@ -105,7 +105,7 @@ func searchLocal(sftp *protocol.SFTPClient, folderPath string) error {
 func sendFileOverSFTP(sftp **protocol.SFTPClient, targetPath string) (int, error) {
 	var lastError error
 	size := 0
-	for i := 0; i < config.uploadRetryCount; i++ {
+	for i := 0; i < config.UploadRetryCount; i++ {
 		destPath, _ := strings.CutPrefix(targetPath, config.Local.Path)
 		destPath = filepath.Join(config.Remote.Path, destPath)
 
@@ -121,14 +121,14 @@ func sendFileOverSFTP(sftp **protocol.SFTPClient, targetPath string) (int, error
 			log.Print(lastError.Error())
 		}
 		if targetFileInfo != nil && stat != nil {
-			if targetSize, freeSize := uint64(targetFileInfo.Size()), stat.FreeSpace(); targetSize+config.spareSpace > freeSize {
+			if targetSize, freeSize := uint64(targetFileInfo.Size()), stat.FreeSpace(); targetSize+config.SpareSpace > freeSize {
 				lastError = fmt.Errorf("not enough space (\n"+
 					"\ttarget file size: %d\n"+
 					"\tfree space: %d\n"+
-					"\tspare space: %d\n)", targetSize, freeSize, config.spareSpace)
+					"\tspare space: %d\n)", targetSize, freeSize, config.SpareSpace)
 				log.Printf(lastError.Error())
 				log.Printf("retrying...")
-				time.Sleep(time.Duration(config.uploadRetryDelay) * time.Second)
+				time.Sleep(time.Duration(config.UploadRetryDelay) * time.Second)
 				continue
 			}
 		}
@@ -157,7 +157,7 @@ func sendFileOverSFTP(sftp **protocol.SFTPClient, targetPath string) (int, error
 				log.Printf("fail to remove %s remote file: %v", destPath, err)
 			}
 			log.Printf("retrying...")
-			time.Sleep(time.Duration(config.uploadRetryDelay) * time.Second)
+			time.Sleep(time.Duration(config.UploadRetryDelay) * time.Second)
 		} else {
 			break
 		}

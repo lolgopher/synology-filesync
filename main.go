@@ -50,7 +50,8 @@ func main() {
 	log.Printf("%s start (version: %s)", programName, programVer)
 
 	// config init
-	config, err := initConfig(configPath)
+	var err error
+	config, err = initConfig(configPath)
 	if err != nil {
 		log.Fatalf("fail to init config: %v", err)
 	}
@@ -67,7 +68,7 @@ func main() {
 		os.Exit(0)
 	}()
 
-	ticker := time.NewTicker(time.Duration(config.syncCycle) * time.Hour)
+	ticker := time.NewTicker(time.Duration(config.SyncCycle) * time.Hour)
 	defer ticker.Stop()
 
 	// 연결 정보 설정
