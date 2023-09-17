@@ -62,6 +62,7 @@ func searchSynologyRecursive(client *protocol.SynologyClient, folderPath string,
 				if err := protocol.WriteMetadata(initFilePath, file.Additional.Size, protocol.Init); err != nil {
 					log.Fatalf("fail to %s write metadata: %v", initFilePath, err)
 				}
+				log.Printf("init %s metadata", initFilePath)
 			} else {
 				// 이미 메타데이터가 존재하는지 확인
 				targetMetadata, err := protocol.ReadMetadata(filepath.Dir(initFilePath))
@@ -74,13 +75,17 @@ func searchSynologyRecursive(client *protocol.SynologyClient, folderPath string,
 					if err := protocol.WriteMetadata(initFilePath, file.Additional.Size, protocol.Init); err != nil {
 						log.Fatalf("fail to %s write metadata: %v", initFilePath, err)
 					}
+					log.Printf("init %s metadata", initFilePath)
 
 					// 기존 파일이 존재하면 삭제
 					if protocol.FileExists(initFilePath) {
 						if err := os.Remove(initFilePath); err != nil {
 							log.Fatalf("fail to %s remove file: %v", initFilePath, err)
 						}
+						log.Printf("remove %s file", initFilePath)
 					}
+				} else {
+					log.Printf("%s metedata already exist", initFilePath)
 				}
 			}
 		}
@@ -141,6 +146,7 @@ func downloadSynologyRecursive(client *protocol.SynologyClient, fileList *protoc
 				if err := protocol.WriteMetadata(downloadFilePath, 0, protocol.NotSent); err != nil {
 					log.Fatalf("fail to %s write metadata: %v", downloadFilePath, err)
 				}
+				log.Printf("%s success download", targetPath)
 			}()
 		}
 	}
