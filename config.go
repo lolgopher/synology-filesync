@@ -19,6 +19,18 @@ type Address struct {
 	Path     string `yaml:"path"`
 }
 
+type DB struct {
+	Host     string `yaml:"host"`
+	Port     string `yaml:"port"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+	Database string `yaml:"database"`
+}
+
+type FileDB struct {
+	Filename string `yaml:"filename"`
+}
+
 type Config struct {
 	DownloadType string   `yaml:"download_type"`
 	Synology     *Address `yaml:"synology,omitempty"`
@@ -26,7 +38,9 @@ type Config struct {
 	UploadType string   `yaml:"upload_type"`
 	SSH        *Address `yaml:"ssh,omitempty"`
 
-	LocalPath string `yaml:"local_path"`
+	DBType    string  `yaml:"db_type"`
+	YAML      *FileDB `yaml:"yaml,omitempty"`
+	LocalPath string  `yaml:"local_path"`
 
 	SpareSpace     uint64 `yaml:"spare_space"`
 	SyncCycle      int    `yaml:"sync_cycle"`
@@ -53,26 +67,30 @@ var defaultConfig = &Config{
 
 	UploadType: "ssh", // Upload type(ssh, skip(TBD), etc...(TBD))
 	SSH: &Address{
-		IP:       "192.168.0.100", // Remote SSH IP address
-		Port:     "22",            // Remote SSH port
-		Username: "user",          // Remote SSH username
-		Password: "pass",          // Remote SSH password
-		Path:     "/DCIM",         // Remote path to download files
+		IP:       "192.168.0.100", // SSH IP address
+		Port:     "22",            // SSH port
+		Username: "user",          // SSH username
+		Password: "pass",          // SSH password
+		Path:     "/DCIM",         // SSH path to download files
 	},
 
-	LocalPath: "", // Local path to save download files (os.Getwd())
+	DBType: "yaml", // DB type(YAML, JSON(TBD), MySQL(TBD), etc...(TBD))
+	YAML: &FileDB{
+		Filename: "metadata.yaml", // FileDB filename
+	},
+	LocalPath: "", // Local path to save download files(os.Getwd())
 
-	SpareSpace:     1073741824,            // 1GByte
-	SyncCycle:      12,                    // Sync Cycle(Hour)
-	DownloadWorker: runtime.GOMAXPROCS(0), // Number of concurrent downloads (runtime.GOMAXPROCS(0))
+	SpareSpace:     1073741824,            // Spare space of upload filesystem(Byte)
+	SyncCycle:      12,                    // Sync cycle(Hour)
+	DownloadWorker: runtime.GOMAXPROCS(0), // Number of concurrent downloads(runtime.GOMAXPROCS(0))
 
-	DownloadDelay:      10, // Download Delay (Second)(TBD)
-	DownloadRetryDelay: 2,  // Download Retry Delay (Second)(TBD)
-	DownloadRetryCount: 10, // Download Retry Count(TBD)
+	DownloadDelay:      10, // Download delay(Second)(TBD)
+	DownloadRetryDelay: 2,  // Download retry delay(Second)(TBD)
+	DownloadRetryCount: 10, // Download retry count(TBD)
 
-	UploadDelay:      10, // Upload Delay (Second)
-	UploadRetryDelay: 2,  // Upload Retry Delay (Second)
-	UploadRetryCount: 10, // Upload Retry Count
+	UploadDelay:      10, // Upload delay(Second)
+	UploadRetryDelay: 2,  // Upload retry delay(Second)
+	UploadRetryCount: 10, // Upload retry count
 }
 
 const defaultConfigPath = "./config.yaml"
@@ -148,29 +166,36 @@ func verifyConfig(config *Config) error {
 		}
 	}
 
-	// verify remote
+	// verify ssh
 	if config.UploadType == "ssh" {
 		// verify ip address
 		if len(config.SSH.IP) == 0 {
-			return errors.New("remote ip address is required")
+			return errors.New("ssh ip address is required")
 		}
 		// verify port number
 		if len(config.SSH.Port) == 0 {
-			return errors.New("remote port is required")
+			return errors.New("ssh port is required")
 		}
 		if _, err := net.LookupPort("tcp", config.SSH.Port); err != nil {
-			return errors.New("invalid remote port number")
+			return errors.New("invalid ssh port number")
 		}
 		// verify username and password
 		if len(config.SSH.Username) == 0 {
-			return errors.New("remote username is required")
+			return errors.New("ssh username is required")
 		}
 		if len(config.SSH.Password) == 0 {
-			return errors.New("remote password is required")
+			return errors.New("ssh password is required")
 		}
 		// verify path
 		if len(config.SSH.Path) == 0 {
-			return errors.New("remote path is required")
+			return errors.New("ssh path is required")
+		}
+	}
+
+	// verify yaml
+	if config.DBType == "yaml" {
+		if len(config.YAML.Filename) == 0 {
+			return errors.New("filename is required")
 		}
 	}
 

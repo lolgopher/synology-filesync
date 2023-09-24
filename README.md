@@ -41,25 +41,26 @@ SFTP를 사용해 다른 서버에 파일을 전송합니다.
       username: admin       # FileStation account username
       password: pass        # FileStation account password
       path: /photo          # FileStation path to download files
-      is_skip: false        # Skip Option(TBD)
     upload_type: ssh    # Upload type(ssh, skip(TBD), etc...(TBD))
     ssh:
-      ip: 192.168.0.100 # Remote SSH IP address
-      port: "22"        # Remote SSH port
-      username: user    # Remote SSH username
-      password: pass    # Remote SSH password
-      path: /DCIM       # Remote path to download files
-      is_skip: false    # Skip Option(TBD)
-    local_path: /Users/user/synology-filesync  # Local path to save download files (os.Getwd())
-    spare_space: 1073741824                    # 1GByte
-    sync_cycle: 12                             # Sync Cycle(Hour)
-    download_worker: 2                         # Number of concurrent downloads (runtime.GOMAXPROCS(0))
-    download_delay: 10                         # Download Delay (Second)(TBD)
-    download_retry_delay: 2                    # Download Retry Delay (Second)(TBD)
-    download_retry_count: 10                   # Download Retry Count(TBD)
-    upload_delay: 10                           # Upload Delay (Second)
-    upload_retry_delay: 2                      # Upload Retry Delay (Second)
-    upload_retry_count: 10                     # Upload Retry Count
+      ip: 192.168.0.100 # SSH IP address
+      port: "22"        # SSH port
+      username: user    # SSH username
+      password: pass    # SSH password
+      path: /DCIM       # SSH path to download files
+    db_type: yaml             # DB type(YAML, JSON(TBD), MySQL(TBD), etc...(TBD))
+    yaml:
+      filename: metadata.yaml # FileDB filename
+    local_path: /Users/user/synology-filesync  # Local path to save download files(os.Getwd())
+    spare_space: 1073741824                    # Spare space of upload filesystem(Byte)
+    sync_cycle: 12                             # Sync cycle(Hour)
+    download_worker: 2                         # Number of concurrent downloads(runtime.GOMAXPROCS(0))
+    download_delay: 10                         # Download delay(Second)(TBD)
+    download_retry_delay: 2                    # Download retry delay(Second)(TBD)
+    download_retry_count: 10                   # Download retry count(TBD)
+    upload_delay: 10                           # Upload delay(Second)
+    upload_retry_delay: 2                      # Upload retry delay(Second)
+    upload_retry_count: 10                     # Upload retry count
     ```
 
 ## 빌드 방법

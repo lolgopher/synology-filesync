@@ -48,7 +48,7 @@ func searchLocal(sftp *protocol.SFTPClient, folderPath string) error {
 
 		if !info.IsDir() && info.Name() != "metadata.yaml" {
 			// 전송에 성공했는지 확인
-			targetMetadata, err := protocol.ReadMetadata(filepath.Dir(targetPath))
+			targetMetadata, err := protocol.ReadMetadata(filepath.Dir(targetPath), config.YAML.Filename)
 			if err != nil {
 				return err
 			}
@@ -86,7 +86,7 @@ func searchLocal(sftp *protocol.SFTPClient, folderPath string) error {
 					}
 				}
 
-				if err := protocol.WriteMetadata(targetPath, 0, result); err != nil {
+				if err := protocol.WriteMetadata(targetPath, config.YAML.Filename, 0, result); err != nil {
 					return err
 				}
 				time.Sleep(time.Duration(config.UploadDelay) * time.Second)

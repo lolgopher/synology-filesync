@@ -58,21 +58,21 @@ func searchSynologyRecursive(client *protocol.SynologyClient, folderPath string,
 			initFilePath := filepath.Join(config.LocalPath, file.Path)
 
 			// 메타데이터가 없으면 초기화
-			if !protocol.FileExists(filepath.Join(filepath.Dir(initFilePath), "metadata.yaml")) {
-				if err := protocol.WriteMetadata(initFilePath, file.Additional.Size, protocol.Init); err != nil {
+			if !protocol.FileExists(filepath.Join(filepath.Dir(initFilePath), config.YAML.Filename)) {
+				if err := protocol.WriteMetadata(initFilePath, config.YAML.Filename, file.Additional.Size, protocol.Init); err != nil {
 					log.Fatalf("fail to %s write metadata: %v", initFilePath, err)
 				}
 				log.Printf("init %s metadata", initFilePath)
 			} else {
 				// 이미 메타데이터가 존재하는지 확인
-				targetMetadata, err := protocol.ReadMetadata(filepath.Dir(initFilePath))
+				targetMetadata, err := protocol.ReadMetadata(filepath.Dir(initFilePath), config.YAML.Filename)
 				if err != nil {
 					return nil, err
 				}
 
 				// 메타데이터에 정보가 없거나 파일 크기가 다르면 초기화
 				if metadata, ok := targetMetadata[initFilePath]; !ok || metadata.Size != file.Additional.Size {
-					if err := protocol.WriteMetadata(initFilePath, file.Additional.Size, protocol.Init); err != nil {
+					if err := protocol.WriteMetadata(initFilePath, config.YAML.Filename, file.Additional.Size, protocol.Init); err != nil {
 						log.Fatalf("fail to %s write metadata: %v", initFilePath, err)
 					}
 					log.Printf("init %s metadata", initFilePath)
@@ -128,7 +128,7 @@ func downloadSynologyRecursive(client *protocol.SynologyClient, fileList *protoc
 				targetPath := filepath.Join(config.LocalPath, filePath)
 
 				// 초기화 상태인지 확인
-				targetMetadata, err := protocol.ReadMetadata(filepath.Dir(targetPath))
+				targetMetadata, err := protocol.ReadMetadata(filepath.Dir(targetPath), config.YAML.Filename)
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -143,7 +143,7 @@ func downloadSynologyRecursive(client *protocol.SynologyClient, fileList *protoc
 					log.Fatalf("fail to %s download file: %v", filePath, err)
 				}
 
-				if err := protocol.WriteMetadata(downloadFilePath, 0, protocol.NotSent); err != nil {
+				if err := protocol.WriteMetadata(downloadFilePath, config.YAML.Filename, 0, protocol.NotSent); err != nil {
 					log.Fatalf("fail to %s write metadata: %v", downloadFilePath, err)
 				}
 				log.Printf("%s success download", targetPath)
