@@ -29,7 +29,7 @@ func uploadRemote(info *protocol.ConnectionInfo) {
 			}
 		}()
 
-		if err := searchLocal(client, filepath.Join(config.Local.Path, config.Synology.Path)); err != nil {
+		if err := searchLocal(client, filepath.Join(config.LocalPath, config.Synology.Path)); err != nil {
 			log.Fatalf("fail to search local: %v", err)
 		}
 	}()
@@ -106,7 +106,7 @@ func sendFileOverSFTP(sftp **protocol.SFTPClient, targetPath string) (int, error
 	var lastError error
 	size := 0
 	for i := 0; i < config.UploadRetryCount; i++ {
-		destPath, _ := strings.CutPrefix(targetPath, config.Local.Path)
+		destPath, _ := strings.CutPrefix(targetPath, config.LocalPath)
 		destPath = filepath.Join(config.Remote.Path, destPath)
 
 		// 용량 확인

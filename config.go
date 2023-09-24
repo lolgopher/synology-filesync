@@ -23,7 +23,7 @@ type Address struct {
 type Config struct {
 	Synology       *Address `yaml:"synology,omitempty"`
 	Remote         *Address `yaml:"remote,omitempty"`
-	Local          *Address `yaml:"local,omitempty"`
+	LocalPath      string   `yaml:"local_path"`
 	SpareSpace     uint64   `yaml:"spare_space"`
 	SyncCycle      int      `yaml:"sync_cycle"`
 	DownloadWorker int      `yaml:"download_worker"`
@@ -54,9 +54,7 @@ var defaultConfig = &Config{
 		Path:     "/DCIM",         // Remote path to download files
 		IsSkip:   false,           // Skip Option
 	},
-	Local: &Address{
-		Path: "", // Local path to save download files (os.Getwd())
-	},
+	LocalPath:      "",         // Local path to save download files (os.Getwd())
 	SpareSpace:     1073741824, // 1GByte
 	SyncCycle:      12,         // Hour
 	DownloadWorker: runtime.GOMAXPROCS(0),
@@ -73,7 +71,7 @@ var defaultConfig = &Config{
 const defaultConfigPath = "./config.yaml"
 
 func initConfig(configPath string) (*Config, error) {
-	defaultConfig.Local.Path, _ = os.Getwd()
+	defaultConfig.LocalPath, _ = os.Getwd()
 	var result *Config
 
 	// 설정 파일 확인
@@ -170,7 +168,7 @@ func verifyConfig(config *Config) error {
 	}
 
 	// verify local
-	if len(config.Local.Path) == 0 {
+	if len(config.LocalPath) == 0 {
 		return errors.New("local path is required")
 	}
 
