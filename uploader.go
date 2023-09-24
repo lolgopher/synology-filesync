@@ -12,7 +12,6 @@ import (
 )
 
 func uploadRemote(info *protocol.ConnectionInfo) {
-	sumOfSize = 0
 	wg.Add(1)
 	go func() {
 		defer func() {
@@ -30,7 +29,7 @@ func uploadRemote(info *protocol.ConnectionInfo) {
 			}
 		}()
 
-		if err := searchLocal(client, filepath.Join(localPath, synoPath)); err != nil {
+		if err := searchLocal(client, filepath.Join(config.LocalPath, config.Synology.Path)); err != nil {
 			log.Fatalf("fail to search local: %v", err)
 		}
 	}()
@@ -49,7 +48,7 @@ func searchLocal(sftp *protocol.SFTPClient, folderPath string) error {
 
 		if !info.IsDir() && info.Name() != "metadata.yaml" {
 			// 전송에 성공했는지 확인
-			targetMetadata, err := protocol.ReadMetadata(filepath.Dir(targetPath))
+			targetMetadata, err := protocol.ReadMetadata(filepath.Dir(targetPath), config.YAML.Filename)
 			if err != nil {
 				return err
 			}
@@ -87,10 +86,10 @@ func searchLocal(sftp *protocol.SFTPClient, folderPath string) error {
 					}
 				}
 
-				if err := protocol.WriteMetadata(targetPath, 0, result); err != nil {
+				if err := protocol.WriteMetadata(targetPath, config.YAML.Filename, 0, result); err != nil {
 					return err
 				}
-				time.Sleep(delay)
+				time.Sleep(time.Duration(config.UploadDelay) * time.Second)
 			default:
 				log.Printf("%s is unknown status", metadata.Status)
 				return nil
@@ -106,9 +105,9 @@ func searchLocal(sftp *protocol.SFTPClient, folderPath string) error {
 func sendFileOverSFTP(sftp **protocol.SFTPClient, targetPath string) (int, error) {
 	var lastError error
 	size := 0
-	for i := 0; i < retryCount; i++ {
-		destPath, _ := strings.CutPrefix(targetPath, localPath)
-		destPath = filepath.Join(remotePath, destPath)
+	for i := 0; i < config.UploadRetryCount; i++ {
+		destPath, _ := strings.CutPrefix(targetPath, config.LocalPath)
+		destPath = filepath.Join(config.SSH.Path, destPath)
 
 		// 용량 확인
 		targetFileInfo, err := os.Stat(targetPath)
@@ -122,14 +121,14 @@ func sendFileOverSFTP(sftp **protocol.SFTPClient, targetPath string) (int, error
 			log.Print(lastError.Error())
 		}
 		if targetFileInfo != nil && stat != nil {
-			if targetSize, freeSize := uint64(targetFileInfo.Size()), stat.FreeSpace(); targetSize+spareSpace > freeSize {
+			if targetSize, freeSize := uint64(targetFileInfo.Size()), stat.FreeSpace(); targetSize+config.SpareSpace > freeSize {
 				lastError = fmt.Errorf("not enough space (\n"+
 					"\ttarget file size: %d\n"+
 					"\tfree space: %d\n"+
-					"\tspare space: %d\n)", targetSize, freeSize, spareSpace)
+					"\tspare space: %d\n)", targetSize, freeSize, config.SpareSpace)
 				log.Printf(lastError.Error())
 				log.Printf("retrying...")
-				time.Sleep(delay * 600)
+				time.Sleep(time.Duration(config.UploadRetryDelay) * time.Second)
 				continue
 			}
 		}
@@ -158,7 +157,7 @@ func sendFileOverSFTP(sftp **protocol.SFTPClient, targetPath string) (int, error
 				log.Printf("fail to remove %s remote file: %v", destPath, err)
 			}
 			log.Printf("retrying...")
-			time.Sleep(delay / 5)
+			time.Sleep(time.Duration(config.UploadRetryDelay) * time.Second)
 		} else {
 			break
 		}

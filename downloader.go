@@ -6,9 +6,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
-	"sync/atomic"
-	"time"
 )
 
 func downloadSynology(info *protocol.ConnectionInfo) {
@@ -18,33 +15,23 @@ func downloadSynology(info *protocol.ConnectionInfo) {
 		log.Fatalf("fail to make synology client: %v", err)
 	}
 
-	stopChan := make(chan int, 1)
-
-	sumOfSize = 0
 	wg.Add(1)
 	go func() {
 		defer func() {
 			wg.Done()
 		}()
 
-		fileListResp, err := searchSynologyRecursive(synoClient, synoPath, 0)
+		fileListResp, err := searchSynologyRecursive(synoClient, config.Synology.Path, 0)
 		if err != nil {
 			log.Fatalf("fail to search from synology filestation: %v", err)
-		}
-
-		if err := writer.Flush(); err != nil {
-			log.Print(err)
 		}
 
 		if err := downloadSynologyRecursive(synoClient, fileListResp); err != nil {
 			log.Fatalf("fail to download from synology filestation: %v", err)
 		}
 	}()
-	go printProgress("Download...", stopChan)
 	wg.Wait()
-	stopChan <- 1
 
-	close(stopChan)
 	log.Print("Done!")
 }
 
@@ -55,12 +42,10 @@ func searchSynologyRecursive(client *protocol.SynologyClient, folderPath string,
 	}
 
 	for _, file := range fileListResp.Data.Files {
-		_, _ = writer.WriteString(strings.Repeat("\t", depth) + file.Name + "\n")
-
 		// 폴더이고 휴지통이 아니면 검색
 		if file.IsDir {
 			if file.Name != "#recycle" {
-				if err := os.MkdirAll(filepath.Join(localPath, file.Path), os.ModePerm); err != nil {
+				if err := os.MkdirAll(filepath.Join(config.LocalPath, file.Path), os.ModePerm); err != nil {
 					log.Fatalf("fail to make download folder: %v", err)
 				}
 
@@ -70,32 +55,37 @@ func searchSynologyRecursive(client *protocol.SynologyClient, folderPath string,
 				}
 			}
 		} else {
-			initFilePath := filepath.Join(localPath, file.Path)
+			initFilePath := filepath.Join(config.LocalPath, file.Path)
 
 			// 메타데이터가 없으면 초기화
-			if !protocol.FileExists(filepath.Join(filepath.Dir(initFilePath), "metadata.yaml")) {
-				if err := protocol.WriteMetadata(initFilePath, file.Additional.Size, protocol.Init); err != nil {
+			if !protocol.FileExists(filepath.Join(filepath.Dir(initFilePath), config.YAML.Filename)) {
+				if err := protocol.WriteMetadata(initFilePath, config.YAML.Filename, file.Additional.Size, protocol.Init); err != nil {
 					log.Fatalf("fail to %s write metadata: %v", initFilePath, err)
 				}
+				log.Printf("init %s metadata", initFilePath)
 			} else {
 				// 이미 메타데이터가 존재하는지 확인
-				targetMetadata, err := protocol.ReadMetadata(filepath.Dir(initFilePath))
+				targetMetadata, err := protocol.ReadMetadata(filepath.Dir(initFilePath), config.YAML.Filename)
 				if err != nil {
 					return nil, err
 				}
 
 				// 메타데이터에 정보가 없거나 파일 크기가 다르면 초기화
 				if metadata, ok := targetMetadata[initFilePath]; !ok || metadata.Size != file.Additional.Size {
-					if err := protocol.WriteMetadata(initFilePath, file.Additional.Size, protocol.Init); err != nil {
+					if err := protocol.WriteMetadata(initFilePath, config.YAML.Filename, file.Additional.Size, protocol.Init); err != nil {
 						log.Fatalf("fail to %s write metadata: %v", initFilePath, err)
 					}
+					log.Printf("init %s metadata", initFilePath)
 
 					// 기존 파일이 존재하면 삭제
 					if protocol.FileExists(initFilePath) {
 						if err := os.Remove(initFilePath); err != nil {
 							log.Fatalf("fail to %s remove file: %v", initFilePath, err)
 						}
+						log.Printf("remove %s file", initFilePath)
 					}
+				} else {
+					log.Printf("%s metedata already exist", initFilePath)
 				}
 			}
 		}
@@ -135,10 +125,10 @@ func downloadSynologyRecursive(client *protocol.SynologyClient, fileList *protoc
 					wg.Done()
 				}()
 
-				targetPath := filepath.Join(localPath, filePath)
+				targetPath := filepath.Join(config.LocalPath, filePath)
 
 				// 초기화 상태인지 확인
-				targetMetadata, err := protocol.ReadMetadata(filepath.Dir(targetPath))
+				targetMetadata, err := protocol.ReadMetadata(filepath.Dir(targetPath), config.YAML.Filename)
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -148,33 +138,18 @@ func downloadSynologyRecursive(client *protocol.SynologyClient, fileList *protoc
 					return
 				}
 
-				downloadFilePath, size, err := client.DownloadFile(filePath, targetPath)
+				downloadFilePath, _, err := client.DownloadFile(filePath, targetPath)
 				if err != nil {
 					log.Fatalf("fail to %s download file: %v", filePath, err)
 				}
-				atomic.AddInt64(&sumOfSize, size)
 
-				if err := protocol.WriteMetadata(downloadFilePath, 0, protocol.NotSent); err != nil {
+				if err := protocol.WriteMetadata(downloadFilePath, config.YAML.Filename, 0, protocol.NotSent); err != nil {
 					log.Fatalf("fail to %s write metadata: %v", downloadFilePath, err)
 				}
+				log.Printf("%s success download", targetPath)
 			}()
 		}
 	}
 
 	return nil
-}
-
-func printProgress(title string, stop <-chan int) {
-	ticker := time.NewTicker(delay)
-	defer ticker.Stop()
-
-	log.Print(title)
-	for {
-		select {
-		case <-stop:
-			return
-		case <-ticker.C:
-			log.Printf("%07d MBytes", sumOfSize/1024/1024)
-		}
-	}
 }

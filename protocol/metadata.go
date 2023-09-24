@@ -26,13 +26,13 @@ const (
 
 var mu sync.Mutex
 
-func ReadMetadata(folderPath string) (map[string]FileMetadata, error) {
+func ReadMetadata(folderPath, filename string) (map[string]FileMetadata, error) {
 	// 크리티컬 섹션 설정
 	mu.Lock()
 	defer mu.Unlock()
 
 	// metadata.yaml 파일 경로 생성
-	metadataFilePath := filepath.Join(folderPath, "metadata.yaml")
+	metadataFilePath := filepath.Join(folderPath, filename)
 
 	// 파일 읽기
 	data, err := os.ReadFile(metadataFilePath)
@@ -50,14 +50,14 @@ func ReadMetadata(folderPath string) (map[string]FileMetadata, error) {
 	return metadata, nil
 }
 
-func WriteMetadata(filePath string, size uint64, status FileTransferStatus) error {
+func WriteMetadata(filePath, filename string, size uint64, status FileTransferStatus) error {
 	// 크리티컬 섹션 설정
 	mu.Lock()
 	defer mu.Unlock()
 
 	// 폴더 경로와 메타데이터 파일 경로 설정
 	folderPath := filepath.Dir(filePath)
-	metadataFilePath := filepath.Join(folderPath, "metadata.yaml")
+	metadataFilePath := filepath.Join(folderPath, filename)
 
 	// 메타데이터 파일 읽기
 	data, err := os.ReadFile(metadataFilePath)

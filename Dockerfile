@@ -29,17 +29,7 @@ RUN strip /build/app
 # ---
 FROM alpine
 
-ENV SYNOLOGY_IP="" \
-    SYNOLOGY_PORT="" \
-    SYNOLOGY_ID="" \
-    SYNOLOGY_PW="" \
-    SYNOLGOY_PATH="" \
-    REMOTE_IP="" \
-    REMOTE_PORT="" \
-    REMOTE_ID="" \
-    REMOTE_PW="" \
-    REMOTE_PATH="" \
-    LOCAL_PATH=""
+ENV CONFIG_PATH=""
 
 COPY --from=builder /build/app .
 COPY --from=builder /build/entrypoint.sh .
