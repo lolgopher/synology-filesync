@@ -37,14 +37,14 @@ SFTP를 사용해 다른 서버에 파일을 전송합니다.
     download_type: synology # Download type(synology, skip(TBD), etc...(TBD))
     synology:
       ip: 1.2.3.4           # FileStation IP address
-      port: "5001"          # FileStation port
+      port: 5001            # FileStation port
       username: admin       # FileStation account username
       password: pass        # FileStation account password
       path: /photo          # FileStation path to download files
     upload_type: ssh    # Upload type(ssh, skip(TBD), etc...(TBD))
     ssh:
       ip: 192.168.0.100 # SSH IP address
-      port: "22"        # SSH port
+      port: 22          # SSH port
       username: user    # SSH username
       password: pass    # SSH password
       path: /DCIM       # SSH path to download files

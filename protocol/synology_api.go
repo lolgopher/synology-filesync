@@ -65,7 +65,7 @@ func newSessionID(info *ConnectionInfo) (string, error) {
 	apiInfo.Set("session", "FileStation")
 
 	// 인증 API 호출
-	synoURL := fmt.Sprintf("http://%s:%s/webapi/auth.cgi?%s", info.IP, info.Port, apiInfo.Encode())
+	synoURL := fmt.Sprintf("http://%s:%d/webapi/auth.cgi?%s", info.IP, info.Port, apiInfo.Encode())
 	resp, err := http.Get(synoURL)
 	if err != nil {
 		return "", fmt.Errorf("fail to get %s url: %v", synoURL, err)
@@ -110,7 +110,7 @@ func (client *SynologyClient) GetFileList(folderPath string) (*FileListResponse,
 	listInfo.Set("_sid", client.SessID)
 	listInfo.Set("additional", "size")
 
-	synoURL := fmt.Sprintf("http://%s:%s/webapi/entry.cgi?%s", client.ConnInfo.IP, client.ConnInfo.Port, listInfo.Encode())
+	synoURL := fmt.Sprintf("http://%s:%d/webapi/entry.cgi?%s", client.ConnInfo.IP, client.ConnInfo.Port, listInfo.Encode())
 	resp, err := http.Get(synoURL)
 	if err != nil {
 		return nil, fmt.Errorf("fail to get %s url: %v", synoURL, err)
@@ -149,7 +149,7 @@ func (client *SynologyClient) DownloadFile(filePath, destPath string) (string, i
 	downloadInfo.Set("path", filePath)
 	downloadInfo.Set("_sid", client.SessID)
 
-	synoURL := fmt.Sprintf("http://%s:%s/webapi/entry.cgi?%s", client.ConnInfo.IP, client.ConnInfo.Port, downloadInfo.Encode())
+	synoURL := fmt.Sprintf("http://%s:%d/webapi/entry.cgi?%s", client.ConnInfo.IP, client.ConnInfo.Port, downloadInfo.Encode())
 	resp, err := http.Get(synoURL)
 	if err != nil {
 		return "", 0, fmt.Errorf("fail to get %s url: %v", synoURL, err)

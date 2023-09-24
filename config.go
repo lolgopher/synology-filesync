@@ -9,11 +9,12 @@ import (
 	"net"
 	"os"
 	"runtime"
+	"strconv"
 )
 
 type Address struct {
 	IP       string `yaml:"ip"`
-	Port     string `yaml:"port"`
+	Port     int    `yaml:"port"`
 	Username string `yaml:"username"`
 	Password string `yaml:"password"`
 	Path     string `yaml:"path"`
@@ -21,7 +22,7 @@ type Address struct {
 
 type DB struct {
 	Host     string `yaml:"host"`
-	Port     string `yaml:"port"`
+	Port     int    `yaml:"port"`
 	Username string `yaml:"username"`
 	Password string `yaml:"password"`
 	Database string `yaml:"database"`
@@ -59,7 +60,7 @@ var defaultConfig = &Config{
 	DownloadType: "synology", // Download type(synology, skip(TBD), etc...(TBD))
 	Synology: &Address{
 		IP:       "1.2.3.4", // FileStation IP address
-		Port:     "5001",    // FileStation port
+		Port:     5001,      // FileStation port
 		Username: "admin",   // FileStation account username
 		Password: "pass",    // FileStation account password
 		Path:     "/photo",  // FileStation path to download files
@@ -68,7 +69,7 @@ var defaultConfig = &Config{
 	UploadType: "ssh", // Upload type(ssh, skip(TBD), etc...(TBD))
 	SSH: &Address{
 		IP:       "192.168.0.100", // SSH IP address
-		Port:     "22",            // SSH port
+		Port:     22,              // SSH port
 		Username: "user",          // SSH username
 		Password: "pass",          // SSH password
 		Path:     "/DCIM",         // SSH path to download files
@@ -147,10 +148,10 @@ func verifyConfig(config *Config) error {
 			return errors.New("synology ip address is required")
 		}
 		// verify port number
-		if len(config.Synology.Port) == 0 {
+		if config.Synology.Port == 0 {
 			return errors.New("synology port is required")
 		}
-		if _, err := net.LookupPort("tcp", config.Synology.Port); err != nil {
+		if _, err := net.LookupPort("tcp", strconv.Itoa(config.Synology.Port)); err != nil {
 			return errors.New("invalid synology port number")
 		}
 		// verify username and password
@@ -173,10 +174,10 @@ func verifyConfig(config *Config) error {
 			return errors.New("ssh ip address is required")
 		}
 		// verify port number
-		if len(config.SSH.Port) == 0 {
+		if config.SSH.Port == 0 {
 			return errors.New("ssh port is required")
 		}
-		if _, err := net.LookupPort("tcp", config.SSH.Port); err != nil {
+		if _, err := net.LookupPort("tcp", strconv.Itoa(config.SSH.Port)); err != nil {
 			return errors.New("invalid ssh port number")
 		}
 		// verify username and password

@@ -28,7 +28,7 @@ func NewSFTPClient(info *ConnectionInfo) (*SFTPClient, error) {
 	}
 
 	// SSH 클라이언트 생성
-	addr := fmt.Sprintf("%s:%s", info.IP, info.Port)
+	addr := fmt.Sprintf("%s:%d", info.IP, info.Port)
 	sshClient, err := ssh.Dial("tcp", addr, sshConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "fail to dial")

@@ -8,7 +8,7 @@ import (
 
 type ConnectionInfo struct {
 	IP       string
-	Port     string
+	Port     int
 	Username string
 	Password string
 }
