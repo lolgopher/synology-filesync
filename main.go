@@ -79,10 +79,10 @@ func main() {
 		Password: config.Synology.Password,
 	}
 	remoteInfo := &protocol.ConnectionInfo{
-		IP:       config.Remote.IP,
-		Port:     config.Remote.Port,
-		Username: config.Remote.Username,
-		Password: config.Remote.Password,
+		IP:       config.SSH.IP,
+		Port:     config.SSH.Port,
+		Username: config.SSH.Username,
+		Password: config.SSH.Password,
 	}
 
 	for ; true; <-ticker.C {

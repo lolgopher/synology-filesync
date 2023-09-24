@@ -26,39 +26,41 @@ SFTP를 사용해 다른 서버에 파일을 전송합니다.
 [릴리즈 페이지](https://github.com/lolgopher/synology-filesync/releases)에서 최신 버전을 다운로드 받아 실행하세요.
 
 - 바이너리 파일 실행 옵션
-   ```
-   Usage of ./synology-filesync:
+    ```
+    Usage of ./synology-filesync:
      -config string
            Config file path
      -v    Show version
-   ```
+    ```
 - config.yaml 속성
-   ```yaml
-   synology:
-      ip: 1.2.3.4       # FileStation IP address
-      port: "5001"      # FileStation port
-      username: admin   # FileStation account username
-      password: pass    # FileStation account password
-      path: /photo      # FileStation path to download files
-      is_skip: false    # Skip Option(TBD)
-   remote:
+    ```yaml
+    download_type: synology # Download type(synology, skip(TBD), etc...(TBD))
+    synology:
+      ip: 1.2.3.4           # FileStation IP address
+      port: "5001"          # FileStation port
+      username: admin       # FileStation account username
+      password: pass        # FileStation account password
+      path: /photo          # FileStation path to download files
+      is_skip: false        # Skip Option(TBD)
+    upload_type: ssh    # Upload type(ssh, skip(TBD), etc...(TBD))
+    ssh:
       ip: 192.168.0.100 # Remote SSH IP address
       port: "22"        # Remote SSH port
       username: user    # Remote SSH username
       password: pass    # Remote SSH password
       path: /DCIM       # Remote path to download files
       is_skip: false    # Skip Option(TBD)
-   local_path: /Users/user/synology-filesync  # Local path to save download files (os.Getwd())
-   spare_space: 1073741824                    # 1GByte
-   sync_cycle: 12                             # Sync Cycle(Hour)
-   download_worker: 2                         # Number of concurrent downloads (runtime.GOMAXPROCS(0))
-   download_delay: 10                         # Download Delay (Second)(TBD)
-   download_retry_delay: 2                    # Download Retry Delay (Second)(TBD)
-   download_retry_count: 10                   # Download Retry Count(TBD)
-   upload_delay: 10                           # Upload Delay (Second)
-   upload_retry_delay: 2                      # Upload Retry Delay (Second)
-   upload_retry_count: 10                     # Upload Retry Count
-   ```
+    local_path: /Users/user/synology-filesync  # Local path to save download files (os.Getwd())
+    spare_space: 1073741824                    # 1GByte
+    sync_cycle: 12                             # Sync Cycle(Hour)
+    download_worker: 2                         # Number of concurrent downloads (runtime.GOMAXPROCS(0))
+    download_delay: 10                         # Download Delay (Second)(TBD)
+    download_retry_delay: 2                    # Download Retry Delay (Second)(TBD)
+    download_retry_count: 10                   # Download Retry Count(TBD)
+    upload_delay: 10                           # Upload Delay (Second)
+    upload_retry_delay: 2                      # Upload Retry Delay (Second)
+    upload_retry_count: 10                     # Upload Retry Count
+    ```
 
 ## 빌드 방법
 

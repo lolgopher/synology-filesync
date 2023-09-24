@@ -107,7 +107,7 @@ func sendFileOverSFTP(sftp **protocol.SFTPClient, targetPath string) (int, error
 	size := 0
 	for i := 0; i < config.UploadRetryCount; i++ {
 		destPath, _ := strings.CutPrefix(targetPath, config.LocalPath)
-		destPath = filepath.Join(config.Remote.Path, destPath)
+		destPath = filepath.Join(config.SSH.Path, destPath)
 
 		// 용량 확인
 		targetFileInfo, err := os.Stat(targetPath)

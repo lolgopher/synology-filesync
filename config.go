@@ -17,16 +17,20 @@ type Address struct {
 	Username string `yaml:"username"`
 	Password string `yaml:"password"`
 	Path     string `yaml:"path"`
-	IsSkip   bool   `yaml:"is_skip"`
 }
 
 type Config struct {
-	Synology       *Address `yaml:"synology,omitempty"`
-	Remote         *Address `yaml:"remote,omitempty"`
-	LocalPath      string   `yaml:"local_path"`
-	SpareSpace     uint64   `yaml:"spare_space"`
-	SyncCycle      int      `yaml:"sync_cycle"`
-	DownloadWorker int      `yaml:"download_worker"`
+	DownloadType string   `yaml:"download_type"`
+	Synology     *Address `yaml:"synology,omitempty"`
+
+	UploadType string   `yaml:"upload_type"`
+	SSH        *Address `yaml:"ssh,omitempty"`
+
+	LocalPath string `yaml:"local_path"`
+
+	SpareSpace     uint64 `yaml:"spare_space"`
+	SyncCycle      int    `yaml:"sync_cycle"`
+	DownloadWorker int    `yaml:"download_worker"`
 
 	DownloadDelay      int `yaml:"download_delay"`
 	DownloadRetryDelay int `yaml:"download_retry_delay"`
@@ -38,23 +42,26 @@ type Config struct {
 }
 
 var defaultConfig = &Config{
+	DownloadType: "synology", // Download type(synology, skip(TBD), etc...(TBD))
 	Synology: &Address{
 		IP:       "1.2.3.4", // FileStation IP address
 		Port:     "5001",    // FileStation port
 		Username: "admin",   // FileStation account username
 		Password: "pass",    // FileStation account password
 		Path:     "/photo",  // FileStation path to download files
-		IsSkip:   false,     // Skip Option(TBD)
 	},
-	Remote: &Address{
+
+	UploadType: "ssh", // Upload type(ssh, skip(TBD), etc...(TBD))
+	SSH: &Address{
 		IP:       "192.168.0.100", // Remote SSH IP address
 		Port:     "22",            // Remote SSH port
 		Username: "user",          // Remote SSH username
 		Password: "pass",          // Remote SSH password
 		Path:     "/DCIM",         // Remote path to download files
-		IsSkip:   false,           // Skip Option(TBD)
 	},
-	LocalPath:      "",                    // Local path to save download files (os.Getwd())
+
+	LocalPath: "", // Local path to save download files (os.Getwd())
+
 	SpareSpace:     1073741824,            // 1GByte
 	SyncCycle:      12,                    // Sync Cycle(Hour)
 	DownloadWorker: runtime.GOMAXPROCS(0), // Number of concurrent downloads (runtime.GOMAXPROCS(0))
@@ -116,7 +123,7 @@ func makeDefaultConfig() error {
 
 func verifyConfig(config *Config) error {
 	// verify synology
-	if !config.Synology.IsSkip {
+	if config.DownloadType == "synology" {
 		// verify ip address
 		if len(config.Synology.IP) == 0 {
 			return errors.New("synology ip address is required")
@@ -142,27 +149,27 @@ func verifyConfig(config *Config) error {
 	}
 
 	// verify remote
-	if !config.Remote.IsSkip {
+	if config.UploadType == "ssh" {
 		// verify ip address
-		if len(config.Remote.IP) == 0 {
+		if len(config.SSH.IP) == 0 {
 			return errors.New("remote ip address is required")
 		}
 		// verify port number
-		if len(config.Remote.Port) == 0 {
+		if len(config.SSH.Port) == 0 {
 			return errors.New("remote port is required")
 		}
-		if _, err := net.LookupPort("tcp", config.Remote.Port); err != nil {
+		if _, err := net.LookupPort("tcp", config.SSH.Port); err != nil {
 			return errors.New("invalid remote port number")
 		}
 		// verify username and password
-		if len(config.Remote.Username) == 0 {
+		if len(config.SSH.Username) == 0 {
 			return errors.New("remote username is required")
 		}
-		if len(config.Remote.Password) == 0 {
+		if len(config.SSH.Password) == 0 {
 			return errors.New("remote password is required")
 		}
 		// verify path
-		if len(config.Remote.Path) == 0 {
+		if len(config.SSH.Path) == 0 {
 			return errors.New("remote path is required")
 		}
 	}
