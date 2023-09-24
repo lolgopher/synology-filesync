@@ -2,10 +2,12 @@
 
 Synology File Station API를 이용해 파일을 다운로드 받고, Remote Server에 전송합니다.
 
-<img alt="Github go.mod Go Version" src="https://img.shields.io/github/go-mod/go-version/lolgopher/synology-filesync">
-<img alt="GitHub Workflow Status" src="https://img.shields.io/github/actions/workflow/status/lolgopher/synology-filesync/ci.yaml">
-<a href="https://goreportcard.com/report/github.com/lolgopher/synology-filesync"><img src="https://goreportcard.com/badge/github.com/lolgopher/synology-filesync" alt="Go Report Card"></a>
-<a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+<div>
+   <img alt="Github go.mod Go Version" src="https://img.shields.io/github/go-mod/go-version/lolgopher/synology-filesync">
+   <img alt="GitHub Workflow Status" src="https://img.shields.io/github/actions/workflow/status/lolgopher/synology-filesync/ci.yaml">
+   <a href="https://goreportcard.com/report/github.com/lolgopher/synology-filesync"><img src="https://goreportcard.com/badge/github.com/lolgopher/synology-filesync" alt="Go Report Card"></a>
+   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+</div>
 
 ## 프로젝트 개요
 
@@ -23,32 +25,40 @@ SFTP를 사용해 다른 서버에 파일을 전송합니다.
 
 [릴리즈 페이지](https://github.com/lolgopher/synology-filesync/releases)에서 최신 버전을 다운로드 받아 실행하세요.
 
-```
-Usage of ./synology-filesync:
-  -localpath string
-        Local path to save download files
-  -remoteid string
-        Remote SSH username
-  -remoteip string
-        Remote SSH IP address
-  -remotepath string
-        Remote path to download files
-  -remoteport string
-        Remote SSH port
-  -remotepw string
-        Remote SSH password
-  -synoid string
-        FileStation account username
-  -synoip string
-        FileStation IP address
-  -synopath string
-        FileStation path to download files
-  -synoport string
-        FileStation port
-  -synopw string
-        FileStation account password
-  -v    Show version
-```
+- 바이너리 파일 실행 옵션
+   ```
+   Usage of ./synology-filesync:
+     -config string
+           Config file path
+     -v    Show version
+   ```
+- config.yaml 속성
+   ```yaml
+   synology:
+      ip: 1.2.3.4       # FileStation IP address
+      port: "5001"      # FileStation port
+      username: admin   # FileStation account username
+      password: pass    # FileStation account password
+      path: /photo      # FileStation path to download files
+      is_skip: false    # Skip Option(TBD)
+   remote:
+      ip: 192.168.0.100 # Remote SSH IP address
+      port: "22"        # Remote SSH port
+      username: user    # Remote SSH username
+      password: pass    # Remote SSH password
+      path: /DCIM       # Remote path to download files
+      is_skip: false    # Skip Option(TBD)
+   local_path: /Users/user/synology-filesync  # Local path to save download files (os.Getwd())
+   spare_space: 1073741824                    # 1GByte
+   sync_cycle: 12                             # Sync Cycle(Hour)
+   download_worker: 2                         # Number of concurrent downloads (runtime.GOMAXPROCS(0))
+   download_delay: 10                         # Download Delay (Second)(TBD)
+   download_retry_delay: 2                    # Download Retry Delay (Second)(TBD)
+   download_retry_count: 10                   # Download Retry Count(TBD)
+   upload_delay: 10                           # Upload Delay (Second)
+   upload_retry_delay: 2                      # Upload Retry Delay (Second)
+   upload_retry_count: 10                     # Upload Retry Count
+   ```
 
 ## 빌드 방법
 
@@ -90,7 +100,7 @@ Usage of ./synology-filesync:
 3. Docker 컨테이너 실행
 
    ```shell
-   docker run --rm -e SYNOLOGY_IP="" synology-filesync   
+   docker run --rm -e CONFIG_PATH="" synology-filesync   
    ```
    
 

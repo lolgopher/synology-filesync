@@ -44,7 +44,7 @@ var defaultConfig = &Config{
 		Username: "admin",   // FileStation account username
 		Password: "pass",    // FileStation account password
 		Path:     "/photo",  // FileStation path to download files
-		IsSkip:   false,     // Skip Option
+		IsSkip:   false,     // Skip Option(TBD)
 	},
 	Remote: &Address{
 		IP:       "192.168.0.100", // Remote SSH IP address
@@ -52,20 +52,20 @@ var defaultConfig = &Config{
 		Username: "user",          // Remote SSH username
 		Password: "pass",          // Remote SSH password
 		Path:     "/DCIM",         // Remote path to download files
-		IsSkip:   false,           // Skip Option
+		IsSkip:   false,           // Skip Option(TBD)
 	},
-	LocalPath:      "",         // Local path to save download files (os.Getwd())
-	SpareSpace:     1073741824, // 1GByte
-	SyncCycle:      12,         // Hour
-	DownloadWorker: runtime.GOMAXPROCS(0),
+	LocalPath:      "",                    // Local path to save download files (os.Getwd())
+	SpareSpace:     1073741824,            // 1GByte
+	SyncCycle:      12,                    // Sync Cycle(Hour)
+	DownloadWorker: runtime.GOMAXPROCS(0), // Number of concurrent downloads (runtime.GOMAXPROCS(0))
 
-	DownloadDelay:      10, // Second
-	DownloadRetryDelay: 2,  // Second
-	DownloadRetryCount: 10,
+	DownloadDelay:      10, // Download Delay (Second)(TBD)
+	DownloadRetryDelay: 2,  // Download Retry Delay (Second)(TBD)
+	DownloadRetryCount: 10, // Download Retry Count(TBD)
 
-	UploadDelay:      10, // Second
-	UploadRetryDelay: 2,  // Second
-	UploadRetryCount: 10,
+	UploadDelay:      10, // Upload Delay (Second)
+	UploadRetryDelay: 2,  // Upload Retry Delay (Second)
+	UploadRetryCount: 10, // Upload Retry Count
 }
 
 const defaultConfigPath = "./config.yaml"
