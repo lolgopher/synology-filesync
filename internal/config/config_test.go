@@ -357,6 +357,7 @@ upload_retry_count: 9
 }
 
 func TestInitConfigMissingFile(t *testing.T) {
+	chdirTemp(t)
 	restoreDefaultConfig(t)
 	path := filepath.Join(t.TempDir(), "missing.yaml")
 	workingDir, err := os.Getwd()
