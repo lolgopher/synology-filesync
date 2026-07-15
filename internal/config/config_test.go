@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"os"
@@ -317,9 +317,9 @@ upload_retry_count: 9
 		t.Fatalf("write config: %v", err)
 	}
 
-	got, err := initConfig(path)
+	got, err := Load(path)
 	if err != nil {
-		t.Fatalf("initConfig() error = %v, want nil", err)
+		t.Fatalf("Load() error = %v, want nil", err)
 	}
 	want := &Config{
 		DownloadType: "synology",
@@ -352,7 +352,7 @@ upload_retry_count: 9
 		UploadRetryCount:   9,
 	}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("initConfig() = %#v, want %#v", got, want)
+		t.Fatalf("Load() = %#v, want %#v", got, want)
 	}
 }
 
@@ -364,12 +364,12 @@ func TestInitConfigMissingFile(t *testing.T) {
 		t.Fatalf("get working directory: %v", err)
 	}
 
-	got, err := initConfig(path)
+	got, err := Load(path)
 	if err == nil {
-		t.Fatal("initConfig() error = nil, want missing-file error")
+		t.Fatal("Load() error = nil, want missing-file error")
 	}
 	if got != nil {
-		t.Fatalf("initConfig() config = %#v, want nil", got)
+		t.Fatalf("Load() config = %#v, want nil", got)
 	}
 	if defaultConfig.LocalPath != workingDir {
 		t.Fatalf("default local path after missing config = %q, want %q", defaultConfig.LocalPath, workingDir)
@@ -383,12 +383,12 @@ func TestInitConfigMalformedFile(t *testing.T) {
 		t.Fatalf("write malformed config: %v", err)
 	}
 
-	got, err := initConfig(path)
+	got, err := Load(path)
 	if err == nil {
-		t.Fatal("initConfig() error = nil, want malformed YAML error")
+		t.Fatal("Load() error = nil, want malformed YAML error")
 	}
 	if got != nil {
-		t.Fatalf("initConfig() config = %#v, want nil", got)
+		t.Fatalf("Load() config = %#v, want nil", got)
 	}
 }
 
@@ -400,17 +400,17 @@ func TestMakeDefaultConfigCreatesCurrentSchema(t *testing.T) {
 		t.Fatalf("get working directory: %v", err)
 	}
 
-	if _, err := initConfig(defaultConfigPath); err == nil {
-		t.Fatal("initConfig(missing default) error = nil, want missing-file error")
+	if _, err := Load(DefaultConfigPath); err == nil {
+		t.Fatal("Load(missing default) error = nil, want missing-file error")
 	}
 
 	if err := makeDefaultConfig(); err != nil {
 		t.Fatalf("makeDefaultConfig() error = %v, want nil", err)
 	}
 
-	got, err := initConfig(defaultConfigPath)
+	got, err := Load(DefaultConfigPath)
 	if err != nil {
-		t.Fatalf("initConfig(default config) error = %v, want nil", err)
+		t.Fatalf("Load(default config) error = %v, want nil", err)
 	}
 	want := currentDefaultConfig(workingDir)
 	if !reflect.DeepEqual(got, want) {
@@ -430,19 +430,19 @@ upload_type: disabled
 db_type: disabled
 local_path: /existing/local
 `)
-	if err := os.WriteFile(defaultConfigPath, want, 0o600); err != nil {
+	if err := os.WriteFile(DefaultConfigPath, want, 0o600); err != nil {
 		t.Fatalf("write existing config: %v", err)
 	}
 
-	if _, err := initConfig(defaultConfigPath); err != nil {
-		t.Fatalf("initConfig() error = %v, want nil", err)
+	if _, err := Load(DefaultConfigPath); err != nil {
+		t.Fatalf("Load() error = %v, want nil", err)
 	}
-	got, err := os.ReadFile(defaultConfigPath)
+	got, err := os.ReadFile(DefaultConfigPath)
 	if err != nil {
 		t.Fatalf("read existing config: %v", err)
 	}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("existing config after initConfig() = %q, want %q", got, want)
+		t.Fatalf("existing config after Load() = %q, want %q", got, want)
 	}
 }
 
