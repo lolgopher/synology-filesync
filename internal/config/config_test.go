@@ -447,6 +447,43 @@ local_path: /existing/local
 	}
 }
 
+func TestFileExistsTreatsOnlyNotExistAsMissing(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte("download_type: disabled\n"), 0o600); err != nil {
+		t.Fatalf("write existing file: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		path string
+		want bool
+	}{
+		{
+			name: "existing file",
+			path: path,
+			want: true,
+		},
+		{
+			name: "missing file",
+			path: filepath.Join(t.TempDir(), "missing.yaml"),
+			want: false,
+		},
+		{
+			name: "stat error that is not missing",
+			path: string([]byte{'b', 'a', 'd', 0, 'p', 'a', 't', 'h'}),
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := fileExists(tt.path); got != tt.want {
+				t.Fatalf("fileExists(%q) = %v, want %v", tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCurrentDefaultConfigSchema(t *testing.T) {
 	restoreDefaultConfig(t)
 	want := currentDefaultConfig("")

@@ -8,7 +8,6 @@ import (
 	"runtime"
 	"strconv"
 
-	"github.com/lolgopher/synology-filesync/protocol"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 )
@@ -95,25 +94,13 @@ var defaultConfig = &Config{
 	UploadRetryCount: 10, // Upload retry count
 }
 
-func DefaultConfig() *Config {
-	return defaultConfig
-}
-
 const DefaultConfigPath = "./config.yaml"
 
 func Load(configPath string) (*Config, error) {
-	return load(configPath, defaultConfig)
-}
-
-func LoadWithDefault(configPath string, defaultConfig *Config) (*Config, error) {
-	return load(configPath, defaultConfig)
-}
-
-func load(configPath string, defaultConfig *Config) (*Config, error) {
 	defaultConfig.LocalPath, _ = os.Getwd()
 	var result *Config
 
-	if protocol.FileExists(configPath) {
+	if fileExists(configPath) {
 		data, err := os.ReadFile(configPath)
 		if err != nil {
 			return nil, fmt.Errorf("fail to read %s config file: %v", configPath, err)
@@ -126,8 +113,8 @@ func load(configPath string, defaultConfig *Config) (*Config, error) {
 	} else {
 		log.Printf("%s config file not found", configPath)
 
-		if !protocol.FileExists(DefaultConfigPath) {
-			if err := makeDefaultConfigWithDefault(defaultConfig); err != nil {
+		if !fileExists(DefaultConfigPath) {
+			if err := makeDefaultConfig(); err != nil {
 				return nil, errors.Wrap(err, "fail to make default config file")
 			}
 		}
@@ -137,19 +124,7 @@ func load(configPath string, defaultConfig *Config) (*Config, error) {
 	return result, Validate(result)
 }
 
-func MakeDefaultConfig() error {
-	return makeDefaultConfig()
-}
-
-func MakeDefaultConfigWithDefault(defaultConfig *Config) error {
-	return makeDefaultConfigWithDefault(defaultConfig)
-}
-
 func makeDefaultConfig() error {
-	return makeDefaultConfigWithDefault(defaultConfig)
-}
-
-func makeDefaultConfigWithDefault(defaultConfig *Config) error {
 	configData, err := yaml.Marshal(defaultConfig)
 	if err != nil {
 		return errors.Wrap(err, "fail to marshal default config")
@@ -159,6 +134,11 @@ func makeDefaultConfigWithDefault(defaultConfig *Config) error {
 	}
 	log.Println("make default config file")
 	return nil
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
 }
 
 func verifyAddress(address *Address, name, pathError string) error {
