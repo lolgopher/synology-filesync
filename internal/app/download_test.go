@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/lolgopher/synology-filesync/protocol"
+	"golang.org/x/sync/semaphore"
 )
 
 func TestIsRecycleDirectory(t *testing.T) {
@@ -107,6 +108,176 @@ func TestNewDownloader_PreservesConfiguredWorkerLimit(t *testing.T) {
 				t.Fatalf("workerLimit = %d, want %d", d.workerLimit, tt.limit)
 			}
 		})
+	}
+}
+
+func TestNewDownloader_PreservesExcludePaths(t *testing.T) {
+	t.Parallel()
+
+	excludePaths := []string{"/root/private", "/root/secret.jpg"}
+	d := NewDownloader(DownloadOptions{ExcludePaths: excludePaths})
+
+	if !reflect.DeepEqual(d.excludePaths, excludePaths) {
+		t.Fatalf("excludePaths = %#v, want %#v", d.excludePaths, excludePaths)
+	}
+}
+
+func TestDownloaderSearchSynologyRecursive_ExcludedRootDoesNotList(t *testing.T) {
+	t.Parallel()
+
+	client := &testSynologyClient{}
+	d := NewDownloader(DownloadOptions{ExcludePaths: []string{"/root"}})
+
+	resp, err := d.searchSynologyRecursive(client, "/root", 0)
+	if err != nil {
+		t.Fatalf("searchSynologyRecursive() error = %v", err)
+	}
+	if resp == nil || !resp.Success || resp.Data.Total != 0 || len(resp.Data.Files) != 0 {
+		t.Fatalf("searchSynologyRecursive() response = %+v, want empty success", resp)
+	}
+	if got := client.GetFileListCalls(); len(got) != 0 {
+		t.Fatalf("GetFileList calls = %#v, want none", got)
+	}
+}
+
+func TestDownloaderSearchSynologyRecursive_ExcludedDirectoryPrunesEffectsButKeepsSiblingPrefix(t *testing.T) {
+	t.Parallel()
+
+	client := &testSynologyClient{
+		fileLists: map[string]*protocol.FileListResponse{
+			"/root": response(
+				dir("private", "/root/private"),
+				dir("private2", "/root/private2"),
+			),
+			"/root/private":  response(file("hidden.jpg", "/root/private/hidden.jpg", 1)),
+			"/root/private2": response(file("visible.jpg", "/root/private2/visible.jpg", 2)),
+		},
+	}
+	store := newTestMetadataStore()
+	var mkdirCalls []string
+	d := NewDownloader(DownloadOptions{
+		LocalPath:        "/download",
+		MetadataFilename: "metadata.yaml",
+		ExcludePaths:     []string{"/root/private"},
+		MkdirAll: func(path string, _ os.FileMode) error {
+			mkdirCalls = append(mkdirCalls, path)
+			return nil
+		},
+		MetadataStore: store,
+		Logger:        &testLogger{},
+	})
+
+	_, err := d.searchSynologyRecursive(client, "/root", 0)
+	if err != nil {
+		t.Fatalf("searchSynologyRecursive() error = %v", err)
+	}
+	if got, want := client.GetFileListCalls(), []string{"/root", "/root/private2"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("GetFileList calls = %#v, want %#v", got, want)
+	}
+	if got, want := mkdirCalls, []string{filepath.Join("/download", "/root/private2")}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("mkdir calls = %#v, want %#v", got, want)
+	}
+	writes := store.WriteCalls()
+	if len(writes) != 1 || writes[0].filePath != filepath.Join("/download", "/root/private2/visible.jpg") {
+		t.Fatalf("metadata writes = %#v, want only private2 file", writes)
+	}
+}
+
+func TestDownloaderSearchSynologyRecursive_ExcludedFileSkipsMetadata(t *testing.T) {
+	t.Parallel()
+
+	client := &testSynologyClient{fileLists: map[string]*protocol.FileListResponse{
+		"/root": response(
+			file("secret.jpg", "/root/secret.jpg", 1),
+			file("public.jpg", "/root/public.jpg", 2),
+		),
+	}}
+	store := newTestMetadataStore()
+	d := NewDownloader(DownloadOptions{
+		LocalPath:        "/download",
+		MetadataFilename: "metadata.yaml",
+		ExcludePaths:     []string{"/root/secret.jpg"},
+		MetadataStore:    store,
+		Logger:           &testLogger{},
+	})
+
+	_, err := d.searchSynologyRecursive(client, "/root", 0)
+	if err != nil {
+		t.Fatalf("searchSynologyRecursive() error = %v", err)
+	}
+	writes := store.WriteCalls()
+	if len(writes) != 1 || writes[0].filePath != filepath.Join("/download", "/root/public.jpg") {
+		t.Fatalf("metadata writes = %#v, want only public file", writes)
+	}
+}
+
+func TestDownloaderDownloadSynologyRecursive_PrebuiltTreeSkipsExcludedPaths(t *testing.T) {
+	t.Parallel()
+
+	client := &testSynologyClient{}
+	d := NewDownloader(DownloadOptions{
+		LocalPath:        "/download",
+		MetadataFilename: "metadata.yaml",
+		ExcludePaths:     []string{"/root/private", "/root/secret.jpg"},
+		MetadataStore:    newTestMetadataStore(),
+		Logger:           &testLogger{},
+	})
+	tree := response(
+		dir("private", "/root/private"),
+		dir("private2", "/root/private2"),
+		file("secret.jpg", "/root/secret.jpg", 1),
+		file("public.jpg", "/root/public.jpg", 1),
+	)
+	tree.Data.Files[0].List = response(file("hidden.jpg", "/root/private/hidden.jpg", 1))
+	tree.Data.Files[1].List = response(file("visible.jpg", "/root/private2/visible.jpg", 1))
+	sem := semaphore.NewWeighted(1)
+	wg := &sync.WaitGroup{}
+
+	if err := d.downloadSynologyRecursive(client, tree, sem, wg, &downloadWorkerFirstError{}); err != nil {
+		t.Fatalf("downloadSynologyRecursive() error = %v", err)
+	}
+	wg.Wait()
+	got := client.DownloadCalls()
+	want := []downloadCall{
+		{filePath: "/root/private2/visible.jpg", destPath: filepath.Join("/download", "/root/private2/visible.jpg")},
+		{filePath: "/root/public.jpg", destPath: filepath.Join("/download", "/root/public.jpg")},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("download calls = %#v, want %#v", got, want)
+	}
+}
+
+func TestDownloaderSearchSynologyRecursive_EmptyExcludePathsPreservesBehavior(t *testing.T) {
+	t.Parallel()
+
+	for _, excludePaths := range [][]string{nil, {}} {
+		client := &testSynologyClient{fileLists: map[string]*protocol.FileListResponse{
+			"/root": response(
+				dir("private", "/root/private"),
+				file("public.jpg", "/root/public.jpg", 1),
+			),
+			"/root/private": response(file("hidden.jpg", "/root/private/hidden.jpg", 2)),
+		}}
+		store := newTestMetadataStore()
+		d := NewDownloader(DownloadOptions{
+			LocalPath:        "/download",
+			MetadataFilename: "metadata.yaml",
+			ExcludePaths:     excludePaths,
+			MkdirAll:         func(string, os.FileMode) error { return nil },
+			MetadataStore:    store,
+			Logger:           &testLogger{},
+		})
+
+		_, err := d.searchSynologyRecursive(client, "/root", 0)
+		if err != nil {
+			t.Fatalf("searchSynologyRecursive(%#v) error = %v", excludePaths, err)
+		}
+		if got, want := client.GetFileListCalls(), []string{"/root", "/root/private"}; !reflect.DeepEqual(got, want) {
+			t.Fatalf("GetFileList calls with %#v = %#v, want %#v", excludePaths, got, want)
+		}
+		if got := len(store.WriteCalls()); got != 2 {
+			t.Fatalf("metadata writes with %#v = %d, want 2", excludePaths, got)
+		}
 	}
 }
 

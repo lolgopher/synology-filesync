@@ -57,6 +57,7 @@ func main() {
 	downloader := app.NewDownloader(app.DownloadOptions{
 		RootRemotePath:   config.Synology.Path,
 		LocalPath:        config.LocalPath,
+		ExcludePaths:     config.ExcludePaths,
 		MetadataFilename: config.YAML.Filename,
 		WorkerLimit:      int64(config.DownloadWorker),
 		SynologyFactory:  synologyFactory,

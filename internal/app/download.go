@@ -18,6 +18,7 @@ type DownloadOptions struct {
 	LocalPath        string
 	MetadataFilename string
 	WorkerLimit      int64
+	ExcludePaths     []string
 
 	MkdirAll func(string, os.FileMode) error
 	Remove   func(string) error
@@ -33,6 +34,7 @@ type Downloader struct {
 	localPath          string
 	metadataFilename   string
 	workerLimit        int64
+	excludePaths       []string
 	mkdirAll           func(string, os.FileMode) error
 	remove             func(string) error
 	synologyFactory    SynologyFactory
@@ -57,6 +59,7 @@ func NewDownloader(opts DownloadOptions) *Downloader {
 		localPath:          opts.LocalPath,
 		metadataFilename:   opts.MetadataFilename,
 		workerLimit:        opts.WorkerLimit,
+		excludePaths:       opts.ExcludePaths,
 		mkdirAll:           mkdirAll,
 		remove:             remove,
 		synologyFactory:    opts.SynologyFactory,
@@ -95,12 +98,20 @@ func (d *Downloader) Run(info *protocol.ConnectionInfo) error {
 }
 
 func (d *Downloader) searchSynologyRecursive(client SynologyClient, folderPath string, depth int) (*protocol.FileListResponse, error) {
+	if isExcludedSynologyPath(folderPath, d.excludePaths) {
+		return &protocol.FileListResponse{Success: true}, nil
+	}
+
 	fileListResp, err := client.GetFileList(folderPath)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, file := range fileListResp.Data.Files {
+		if isExcludedSynologyPath(file.Path, d.excludePaths) {
+			continue
+		}
+
 		if file.IsDir {
 			if !isRecycleDirectory(file.Name) {
 				if err := d.mkdirAll(filepath.Join(d.localPath, file.Path), os.ModePerm); err != nil {
@@ -128,6 +139,10 @@ func (d *Downloader) downloadSynologyRecursive(client SynologyClient, fileList *
 	ctx := context.Background()
 
 	for _, file := range fileList.Data.Files {
+		if isExcludedSynologyPath(file.Path, d.excludePaths) {
+			continue
+		}
+
 		if file.IsDir {
 			if !isRecycleDirectory(file.Name) {
 				if err := d.downloadSynologyRecursive(client, file.List, sem, wg, workerErr); err != nil {
