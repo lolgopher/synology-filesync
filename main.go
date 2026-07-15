@@ -69,6 +69,7 @@ func main() {
 	})
 	uploader := app.NewUploader(app.UploadOptions{
 		LocalPath:        config.LocalPath,
+		ExcludePaths:     config.ExcludePaths,
 		SynologyPath:     config.Synology.Path,
 		SSHPath:          config.SSH.Path,
 		YAMLFilename:     config.YAML.Filename,

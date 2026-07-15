@@ -134,6 +134,175 @@ func TestUploaderSearch_MissingRootReturnsWalkError(t *testing.T) {
 	}
 }
 
+func TestUploaderSearch_ExcludePathsPrunesExcludedDirectoryDescendants(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	visiblePath := uploadMustWriteFile(t, root, filepath.Join("photo", "private2", "visible.jpg"), []byte("visible"))
+	hiddenPath := uploadMustWriteFile(t, root, filepath.Join("photo", "private", "nested", "hidden.jpg"), []byte("hidden"))
+	store := newUploadTestMetadataStore()
+	store.SetRead(filepath.Dir(visiblePath), "metadata.yaml", map[string]protocol.FileMetadata{
+		visiblePath: {Status: string(protocol.Sent)},
+	})
+	store.SetRead(filepath.Dir(hiddenPath), "metadata.yaml", map[string]protocol.FileMetadata{
+		hiddenPath: {Status: string(protocol.Sent)},
+	})
+	logger := &uploadTestLogger{}
+	client := &uploadTestSFTPClient{}
+	uploader := NewUploader(UploadOptions{
+		LocalPath:    root,
+		YAMLFilename: "metadata.yaml",
+		ExcludePaths: []string{"/photo/private"},
+	}, store, newUploadTestSFTPFactory(client).Fn(), logger, nil)
+	uploader.client = client
+
+	if err := uploader.Search(filepath.Join(root, "photo")); err != nil {
+		t.Fatalf("Search() error = %v", err)
+	}
+	if got := store.ReadCalls(); !reflect.DeepEqual(got, []uploadReadCall{{folderPath: filepath.Dir(visiblePath), filename: "metadata.yaml"}}) {
+		t.Fatalf("read calls = %#v", got)
+	}
+	if len(store.WriteCalls()) != 0 || len(client.sendCalls) != 0 || len(client.freeSpaceCalls) != 0 || len(client.removeCalls) != 0 {
+		t.Fatalf("unexpected side effects: write=%#v send=%#v free=%#v remove=%#v", store.WriteCalls(), client.sendCalls, client.freeSpaceCalls, client.removeCalls)
+	}
+	if got := logger.Entries(); !reflect.DeepEqual(got, []string{visiblePath + " has already been sent"}) {
+		t.Fatalf("logs = %#v", got)
+	}
+}
+
+func TestUploaderSearch_ExcludePathsSkipsExactFileBeforeMetadataAndSFTP(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	excludedPath := uploadMustWriteFile(t, root, filepath.Join("photo", "private", "secret.jpg"), []byte("secret"))
+	includedPath := uploadMustWriteFile(t, root, filepath.Join("photo", "public.jpg"), []byte("public"))
+	store := newUploadTestMetadataStore()
+	store.SetRead(filepath.Dir(includedPath), "metadata.yaml", map[string]protocol.FileMetadata{
+		includedPath: {Status: string(protocol.Sent)},
+	})
+	store.SetRead(filepath.Dir(excludedPath), "metadata.yaml", map[string]protocol.FileMetadata{
+		excludedPath: {Status: string(protocol.Sent)},
+	})
+	logger := &uploadTestLogger{}
+	client := &uploadTestSFTPClient{}
+	uploader := NewUploader(UploadOptions{
+		LocalPath:    root,
+		YAMLFilename: "metadata.yaml",
+		ExcludePaths: []string{"/photo/private/secret.jpg"},
+	}, store, newUploadTestSFTPFactory(client).Fn(), logger, nil)
+	uploader.client = client
+
+	if err := uploader.Search(filepath.Join(root, "photo")); err != nil {
+		t.Fatalf("Search() error = %v", err)
+	}
+	if got := store.ReadCalls(); !reflect.DeepEqual(got, []uploadReadCall{{folderPath: filepath.Dir(includedPath), filename: "metadata.yaml"}}) {
+		t.Fatalf("read calls = %#v", got)
+	}
+	if len(store.WriteCalls()) != 0 || len(client.sendCalls) != 0 || len(client.freeSpaceCalls) != 0 || len(client.removeCalls) != 0 {
+		t.Fatalf("unexpected side effects: write=%#v send=%#v free=%#v remove=%#v", store.WriteCalls(), client.sendCalls, client.freeSpaceCalls, client.removeCalls)
+	}
+	if got := logger.Entries(); !reflect.DeepEqual(got, []string{includedPath + " has already been sent"}) {
+		t.Fatalf("logs = %#v", got)
+	}
+}
+
+func TestUploaderSearch_ExcludePathsDoesNotTreatSharedPrefixAsExcluded(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	visiblePath := uploadMustWriteFile(t, root, filepath.Join("photo", "private2", "visible.jpg"), []byte("visible"))
+	hiddenPath := uploadMustWriteFile(t, root, filepath.Join("photo", "private", "hidden.jpg"), []byte("hidden"))
+	store := newUploadTestMetadataStore()
+	store.SetRead(filepath.Dir(visiblePath), "metadata.yaml", map[string]protocol.FileMetadata{
+		visiblePath: {Status: string(protocol.Sent)},
+	})
+	store.SetRead(filepath.Dir(hiddenPath), "metadata.yaml", map[string]protocol.FileMetadata{
+		hiddenPath: {Status: string(protocol.Sent)},
+	})
+	logger := &uploadTestLogger{}
+	client := &uploadTestSFTPClient{}
+	uploader := NewUploader(UploadOptions{
+		LocalPath:    root,
+		YAMLFilename: "metadata.yaml",
+		ExcludePaths: []string{"/photo/private"},
+	}, store, newUploadTestSFTPFactory(client).Fn(), logger, nil)
+	uploader.client = client
+
+	if err := uploader.Search(filepath.Join(root, "photo")); err != nil {
+		t.Fatalf("Search() error = %v", err)
+	}
+	if got := store.ReadCalls(); !reflect.DeepEqual(got, []uploadReadCall{{folderPath: filepath.Dir(visiblePath), filename: "metadata.yaml"}}) {
+		t.Fatalf("read calls = %#v", got)
+	}
+	if got := logger.Entries(); !reflect.DeepEqual(got, []string{visiblePath + " has already been sent"}) {
+		t.Fatalf("logs = %#v", got)
+	}
+}
+
+func TestUploaderSearch_ExcludePathsPrunesWalkRootWhenSynologyRootExcluded(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	uploadMustWriteFile(t, root, filepath.Join("photo", "private", "hidden.jpg"), []byte("hidden"))
+	uploadMustWriteFile(t, root, filepath.Join("photo", "public.jpg"), []byte("public"))
+	store := newUploadTestMetadataStore()
+	client := &uploadTestSFTPClient{}
+	uploader := NewUploader(UploadOptions{
+		LocalPath:    root,
+		YAMLFilename: "metadata.yaml",
+		ExcludePaths: []string{"/photo"},
+	}, store, newUploadTestSFTPFactory(client).Fn(), &uploadTestLogger{}, nil)
+	uploader.client = client
+
+	if err := uploader.Search(filepath.Join(root, "photo")); err != nil {
+		t.Fatalf("Search() error = %v", err)
+	}
+	if got := store.ReadCalls(); len(got) != 0 {
+		t.Fatalf("read calls = %#v, want none", got)
+	}
+	if len(store.WriteCalls()) != 0 || len(client.sendCalls) != 0 || len(client.freeSpaceCalls) != 0 || len(client.removeCalls) != 0 {
+		t.Fatalf("unexpected side effects: write=%#v send=%#v free=%#v remove=%#v", store.WriteCalls(), client.sendCalls, client.freeSpaceCalls, client.removeCalls)
+	}
+}
+
+func TestUploaderSearch_EmptyExcludePathsPreserveBehavior(t *testing.T) {
+	t.Parallel()
+
+	for _, excludePaths := range [][]string{nil, {}} {
+		root := t.TempDir()
+		firstPath := uploadMustWriteFile(t, root, filepath.Join("photo", "private", "hidden.jpg"), []byte("hidden"))
+		secondPath := uploadMustWriteFile(t, root, filepath.Join("photo", "private2", "visible.jpg"), []byte("visible"))
+		store := newUploadTestMetadataStore()
+		store.SetRead(filepath.Dir(firstPath), "metadata.yaml", map[string]protocol.FileMetadata{
+			firstPath: {Status: string(protocol.Sent)},
+		})
+		store.SetRead(filepath.Dir(secondPath), "metadata.yaml", map[string]protocol.FileMetadata{
+			secondPath: {Status: string(protocol.Sent)},
+		})
+		logger := &uploadTestLogger{}
+		client := &uploadTestSFTPClient{}
+		uploader := NewUploader(UploadOptions{
+			LocalPath:    root,
+			YAMLFilename: "metadata.yaml",
+			ExcludePaths: excludePaths,
+		}, store, newUploadTestSFTPFactory(client).Fn(), logger, nil)
+		uploader.client = client
+
+		if err := uploader.Search(filepath.Join(root, "photo")); err != nil {
+			t.Fatalf("Search(%#v) error = %v", excludePaths, err)
+		}
+		if got := store.ReadCalls(); !reflect.DeepEqual(got, []uploadReadCall{{folderPath: filepath.Dir(firstPath), filename: "metadata.yaml"}, {folderPath: filepath.Dir(secondPath), filename: "metadata.yaml"}}) {
+			t.Fatalf("read calls with %#v = %#v", excludePaths, got)
+		}
+		if got := logger.Entries(); !reflect.DeepEqual(got, []string{firstPath + " has already been sent", secondPath + " has already been sent"}) {
+			t.Fatalf("logs with %#v = %#v", excludePaths, got)
+		}
+		if len(store.WriteCalls()) != 0 || len(client.sendCalls) != 0 || len(client.freeSpaceCalls) != 0 || len(client.removeCalls) != 0 {
+			t.Fatalf("unexpected side effects with %#v: write=%#v send=%#v free=%#v remove=%#v", excludePaths, store.WriteCalls(), client.sendCalls, client.freeSpaceCalls, client.removeCalls)
+		}
+	}
+}
+
 func TestUploaderSearch_NotSentSuccessWritesSentAndSleeps(t *testing.T) {
 	t.Parallel()
 

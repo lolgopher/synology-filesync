@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -14,6 +15,7 @@ import (
 type UploadOptions struct {
 	LocalPath        string
 	SynologyPath     string
+	ExcludePaths     []string
 	SSHPath          string
 	YAMLFilename     string
 	SpareSpace       uint64
@@ -116,6 +118,22 @@ func (u *Uploader) Search(folderPath string) error {
 	err := filepath.Walk(folderPath, func(targetPath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
+		}
+
+		if len(u.options.ExcludePaths) > 0 {
+			rel, err := filepath.Rel(u.options.LocalPath, targetPath)
+			if err != nil {
+				return err
+			}
+
+			candidate := path.Clean("/" + filepath.ToSlash(rel))
+			if isExcludedSynologyPath(candidate, u.options.ExcludePaths) {
+				if info.IsDir() {
+					return filepath.SkipDir
+				}
+
+				return nil
+			}
 		}
 
 		if !info.IsDir() && info.Name() != "metadata.yaml" {
