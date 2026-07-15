@@ -133,7 +133,7 @@ func downloadSynologyRecursive(client *protocol.SynologyClient, fileList *protoc
 					log.Fatal(err)
 				}
 
-				if metadata, ok := targetMetadata[targetPath]; ok && metadata.Status != string(protocol.Init) {
+				if metadata, ok := targetMetadata[targetPath]; ok && metadata.Status != protocol.Init {
 					log.Printf("%s has already been download", targetPath)
 					return
 				}

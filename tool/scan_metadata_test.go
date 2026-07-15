@@ -50,7 +50,7 @@ func TestGetStatusFiltersMetadataInNestedDirectories(t *testing.T) {
 					t.Errorf("missing complete path key %q", path)
 					continue
 				}
-				if entry.Status != string(tt.status) {
+				if entry.Status != tt.status {
 					t.Errorf("status for %q = %q, want %q", path, entry.Status, tt.status)
 				}
 			}

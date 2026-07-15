@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
-	"github.com/lolgopher/synology-filesync/protocol"
-	"github.com/pkg/errors"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/lolgopher/synology-filesync/protocol"
+	"github.com/pkg/errors"
 )
 
 func uploadRemote(info *protocol.ConnectionInfo) {
@@ -58,7 +59,7 @@ func searchLocal(sftp *protocol.SFTPClient, folderPath string) error {
 				return fmt.Errorf("fail to find %s in metadata", targetPath)
 			}
 
-			switch protocol.FileTransferStatus(metadata.Status) {
+			switch metadata.Status {
 			case protocol.Init:
 				log.Printf("%s is init metadata status", targetPath)
 				return nil
