@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
 
@@ -26,9 +25,6 @@ var (
 	gitHash    = "unknown"
 	buildStamp = "unknown"
 	programVer = fmt.Sprintf("%s-%s(%s)", buildTag, gitHash, buildStamp)
-
-	config *Config
-	wg     sync.WaitGroup
 )
 
 func main() {
