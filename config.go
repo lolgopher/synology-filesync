@@ -140,56 +140,41 @@ func makeDefaultConfig() error {
 	return nil
 }
 
+func verifyAddress(address *Address, name, pathError string) error {
+	if len(address.IP) == 0 {
+		return errors.New(name + " ip address is required")
+	}
+	if address.Port == 0 {
+		return errors.New(name + " port is required")
+	}
+	if _, err := net.LookupPort("tcp", strconv.Itoa(address.Port)); err != nil {
+		return errors.New("invalid " + name + " port number")
+	}
+	if len(address.Username) == 0 {
+		return errors.New(name + " username is required")
+	}
+	if len(address.Password) == 0 {
+		return errors.New(name + " password is required")
+	}
+	if len(address.Path) == 0 {
+		return errors.New(pathError)
+	}
+
+	return nil
+}
+
 func verifyConfig(config *Config) error {
 	// verify synology
 	if config.DownloadType == "synology" {
-		// verify ip address
-		if len(config.Synology.IP) == 0 {
-			return errors.New("synology ip address is required")
-		}
-		// verify port number
-		if config.Synology.Port == 0 {
-			return errors.New("synology port is required")
-		}
-		if _, err := net.LookupPort("tcp", strconv.Itoa(config.Synology.Port)); err != nil {
-			return errors.New("invalid synology port number")
-		}
-		// verify username and password
-		if len(config.Synology.Username) == 0 {
-			return errors.New("synology username is required")
-		}
-		if len(config.Synology.Password) == 0 {
-			return errors.New("synology password is required")
-		}
-		// verify path
-		if len(config.Synology.Path) == 0 {
-			return errors.New("filestation path is required")
+		if err := verifyAddress(config.Synology, "synology", "filestation path is required"); err != nil {
+			return err
 		}
 	}
 
 	// verify ssh
 	if config.UploadType == "ssh" {
-		// verify ip address
-		if len(config.SSH.IP) == 0 {
-			return errors.New("ssh ip address is required")
-		}
-		// verify port number
-		if config.SSH.Port == 0 {
-			return errors.New("ssh port is required")
-		}
-		if _, err := net.LookupPort("tcp", strconv.Itoa(config.SSH.Port)); err != nil {
-			return errors.New("invalid ssh port number")
-		}
-		// verify username and password
-		if len(config.SSH.Username) == 0 {
-			return errors.New("ssh username is required")
-		}
-		if len(config.SSH.Password) == 0 {
-			return errors.New("ssh password is required")
-		}
-		// verify path
-		if len(config.SSH.Path) == 0 {
-			return errors.New("ssh path is required")
+		if err := verifyAddress(config.SSH, "ssh", "ssh path is required"); err != nil {
+			return err
 		}
 	}
 
