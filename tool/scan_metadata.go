@@ -1,9 +1,10 @@
 package tool
 
 import (
-	metadata "github.com/lolgopher/synology-filesync/protocol"
 	"os"
 	"path/filepath"
+
+	metadata "github.com/lolgopher/synology-filesync/protocol"
 )
 
 func GetInitStatus(folderPath string) (map[string]metadata.FileMetadata, error) {
@@ -27,7 +28,7 @@ func searchMetadata(folderPath string, status metadata.FileTransferStatus) (map[
 
 	err := filepath.Walk(folderPath, func(targetPath string, info os.FileInfo, err error) error {
 		if info.IsDir() {
-			if data, err := metadata.ReadMetadata(targetPath); err == nil {
+			if data, err := metadata.ReadMetadata(targetPath, "metadata.yaml"); err == nil {
 				for key, value := range data {
 					if value.Status == string(status) {
 						result[key] = value
