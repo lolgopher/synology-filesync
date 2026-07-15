@@ -51,7 +51,7 @@ func TestWriteMetadata_YAMLShapeAndStatuses(t *testing.T) {
 			if entry.Size != uint64(wantSize) {
 				t.Fatalf("size = %d, want %d", entry.Size, wantSize)
 			}
-			if entry.Status != status {
+			if entry.Status != string(status) {
 				t.Fatalf("status = %q, want %q", entry.Status, status)
 			}
 			if !strings.Contains(string(raw), "status: "+string(status)+"\n") {
@@ -65,7 +65,7 @@ func TestWriteMetadata_YAMLShapeAndStatuses(t *testing.T) {
 			if got := metadata[filePath].Size; got != uint64(wantSize) {
 				t.Fatalf("read size = %d, want %d", got, wantSize)
 			}
-			if got := metadata[filePath].Status; got != status {
+			if got := metadata[filePath].Status; got != string(status) {
 				t.Fatalf("read status = %q, want %q", got, status)
 			}
 		})
@@ -91,7 +91,7 @@ func TestWriteMetadata_InitUsesSuppliedSizeAndNonInitPreservesExistingSize(t *te
 		t.Fatalf("read metadata: %v", err)
 	}
 
-	if got := metadata[filePath]; got.Size != 41 || got.Status != Sent {
+	if got := metadata[filePath]; got.Size != 41 || got.Status != string(Sent) {
 		t.Fatalf("metadata[%q] = %#v, want size preserved at 41 and status %q", filePath, got, Sent)
 	}
 }
@@ -104,7 +104,7 @@ func TestWriteMetadataAndReadMetadata_RoundTrip(t *testing.T) {
 	filePath := filepath.Join(dir, "roundtrip.txt")
 
 	want := map[string]FileMetadata{
-		filePath: {Size: 7, Status: Init},
+		filePath: {Size: 7, Status: string(Init)},
 	}
 
 	if err := WriteMetadata(filePath, metadataName, want[filePath].Size, Init); err != nil {
@@ -136,7 +136,7 @@ func TestWriteMetadata_NonInitWithoutExistingEntryUsesZeroSize(t *testing.T) {
 		t.Fatalf("read metadata: %v", err)
 	}
 
-	if got := metadata[filePath]; got.Size != 0 || got.Status != Sent {
+	if got := metadata[filePath]; got.Size != 0 || got.Status != string(Sent) {
 		t.Fatalf("metadata[%q] = %#v, want zero size and status %q", filePath, got, Sent)
 	}
 }
@@ -174,7 +174,7 @@ func TestWriteMetadata_MissingFileCreatesMetadataFileWithEntry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read metadata: %v", err)
 	}
-	if got := metadata[filePath]; got.Size != 55 || got.Status != Init {
+	if got := metadata[filePath]; got.Size != 55 || got.Status != string(Init) {
 		t.Fatalf("metadata[%q] = %#v, want size 55 and status %q", filePath, got, Init)
 	}
 }

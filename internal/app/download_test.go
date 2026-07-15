@@ -252,7 +252,7 @@ func TestDownloaderInitializeMetadata_ReinitializesMissingOrMismatchedEntries(t 
 		{
 			name: "size mismatch",
 			metadata: map[string]protocol.FileMetadata{
-				filepath.Join("/download", "/root/a.jpg"): {Size: 9, Status: protocol.Sent},
+				filepath.Join("/download", "/root/a.jpg"): {Size: 9, Status: string(protocol.Sent)},
 			},
 			size: 10,
 		},
@@ -314,7 +314,7 @@ func TestDownloaderInitializeMetadata_PreservesMatchingMetadataAndLogsTypo(t *te
 	store := newTestMetadataStore()
 	store.SetExists(filepath.Join(filepath.Dir(filePath), "metadata.yaml"), true)
 	store.SetRead(filepath.Dir(filePath), "metadata.yaml", map[string]protocol.FileMetadata{
-		filePath: {Size: 10, Status: protocol.Sent},
+		filePath: {Size: 10, Status: string(protocol.Sent)},
 	})
 	logger := &testLogger{}
 	removed := false
@@ -421,7 +421,7 @@ func TestDownloaderDownloadFile_SkipsNonInitStatuses(t *testing.T) {
 			logger := &testLogger{}
 			filePath := filepath.Join("/download", "/root/a.jpg")
 			store.SetRead(filepath.Dir(filePath), "metadata.yaml", map[string]protocol.FileMetadata{
-				filePath: {Size: 10, Status: status},
+				filePath: {Size: 10, Status: string(status)},
 			})
 			d := NewDownloader(DownloadOptions{
 				LocalPath:        "/download",
@@ -458,7 +458,7 @@ func TestDownloaderDownloadFile_DownloadsInitAndMissingMetadataEntries(t *testin
 		{
 			name: "init metadata",
 			metadata: map[string]protocol.FileMetadata{
-				filepath.Join("/download", "/root/a.jpg"): {Size: 10, Status: protocol.Init},
+				filepath.Join("/download", "/root/a.jpg"): {Size: 10, Status: string(protocol.Init)},
 			},
 		},
 		{
@@ -833,7 +833,7 @@ func (s *testMetadataStore) Write(filePath, filename string, size uint64, status
 	if _, ok := s.readData[metadataPath]; !ok {
 		s.readData[metadataPath] = make(map[string]protocol.FileMetadata)
 	}
-	s.readData[metadataPath][filePath] = protocol.FileMetadata{Size: size, Status: status}
+	s.readData[metadataPath][filePath] = protocol.FileMetadata{Size: size, Status: string(status)}
 	return nil
 }
 

@@ -28,7 +28,7 @@ func TestStoreWrite(t *testing.T) {
 	want := map[string]protocol.FileMetadata{
 		filePath: {
 			Size:   7,
-			Status: protocol.Init,
+			Status: string(protocol.Init),
 		},
 	}
 	if len(metadata) != len(want) {
@@ -60,7 +60,7 @@ func TestStoreRead(t *testing.T) {
 	want := map[string]protocol.FileMetadata{
 		filePath: {
 			Size:   11,
-			Status: protocol.Sent,
+			Status: string(protocol.Sent),
 		},
 	}
 	if len(metadata) != len(want) {

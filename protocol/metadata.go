@@ -11,8 +11,8 @@ import (
 )
 
 type FileMetadata struct {
-	Size   uint64             `yaml:"size"`
-	Status FileTransferStatus `yaml:"status"`
+	Size   uint64 `yaml:"size"`
+	Status string `yaml:"status"`
 }
 
 type FileTransferStatus string
@@ -111,7 +111,7 @@ func WriteMetadata(filePath, filename string, size uint64, status FileTransferSt
 	}
 	metadata[filePath] = FileMetadata{
 		Size:   size,
-		Status: status,
+		Status: string(status),
 	}
 
 	// 메타데이터 파일 쓰기

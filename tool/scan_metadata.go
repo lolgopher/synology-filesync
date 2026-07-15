@@ -30,7 +30,7 @@ func searchMetadata(folderPath string, status metadata.FileTransferStatus) (map[
 		if info.IsDir() {
 			if data, err := metadata.ReadMetadata(targetPath, "metadata.yaml"); err == nil {
 				for key, value := range data {
-					if value.Status == status {
+					if value.Status == string(status) {
 						result[key] = value
 					}
 				}

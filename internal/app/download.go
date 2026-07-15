@@ -165,7 +165,7 @@ func (d *Downloader) downloadFile(client SynologyClient, filePath string) error 
 		return err
 	}
 
-	if metadata, ok := targetMetadata[targetPath]; ok && metadata.Status != protocol.Init {
+	if metadata, ok := targetMetadata[targetPath]; ok && protocol.FileTransferStatus(metadata.Status) != protocol.Init {
 		d.logger.Printf("%s has already been download", targetPath)
 		return nil
 	}

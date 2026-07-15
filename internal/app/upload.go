@@ -129,7 +129,7 @@ func (u *Uploader) Search(folderPath string) error {
 				return fmt.Errorf("fail to find %s in metadata", targetPath)
 			}
 
-			switch metadata.Status {
+			switch protocol.FileTransferStatus(metadata.Status) {
 			case protocol.Init:
 				u.logger.Printf("%s is init metadata status", targetPath)
 				return nil

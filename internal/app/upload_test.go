@@ -23,7 +23,7 @@ func TestUploaderSearch_SkipsLiteralMetadataYAML(t *testing.T) {
 
 	store := newUploadTestMetadataStore()
 	store.SetRead(filepath.Dir(targetPath), "custom.yaml", map[string]protocol.FileMetadata{
-		targetPath: {Status: protocol.Sent},
+		targetPath: {Status: string(protocol.Sent)},
 	})
 	logger := &uploadTestLogger{}
 	sleeper := &uploadTestSleeper{}
@@ -71,7 +71,7 @@ func TestUploaderSearch_StatusLogsAndSkipsWork(t *testing.T) {
 			targetPath := uploadMustWriteFile(t, root, "album/photo.jpg", []byte("photo"))
 			store := newUploadTestMetadataStore()
 			store.SetRead(filepath.Dir(targetPath), "metadata.db", map[string]protocol.FileMetadata{
-				targetPath: {Status: tt.status},
+				targetPath: {Status: string(tt.status)},
 			})
 			logger := &uploadTestLogger{}
 			sleeper := &uploadTestSleeper{}
@@ -155,7 +155,7 @@ func TestUploaderSearch_NotSentSuccessWritesSentAndSleeps(t *testing.T) {
 			targetPath := uploadMustWriteFile(t, root, "album/photo.jpg", []byte("photo"))
 			store := newUploadTestMetadataStore()
 			store.SetRead(filepath.Dir(targetPath), "metadata.yaml", map[string]protocol.FileMetadata{
-				targetPath: {Status: protocol.NotSent},
+				targetPath: {Status: string(protocol.NotSent)},
 			})
 			client := &uploadTestSFTPClient{
 				freeSpaceResults: []uploadFreeSpaceResult{{size: 1 << 20}},
@@ -199,7 +199,7 @@ func TestUploaderSearch_SendFailureWritesFailedAndSleepsRetries(t *testing.T) {
 	destPath := filepath.Join("/remote", strings.TrimPrefix(targetPath, root))
 	store := newUploadTestMetadataStore()
 	store.SetRead(filepath.Dir(targetPath), "metadata.yaml", map[string]protocol.FileMetadata{
-		targetPath: {Status: protocol.NotSent},
+		targetPath: {Status: string(protocol.NotSent)},
 	})
 	client := &uploadTestSFTPClient{
 		freeSpaceResults: []uploadFreeSpaceResult{{size: 1 << 20}, {size: 1 << 20}},
@@ -280,7 +280,7 @@ func TestUploaderSearch_ZeroRetryCountMarksSentZeroSize(t *testing.T) {
 	targetPath := uploadMustWriteFile(t, root, "album/photo.jpg", []byte("photo"))
 	store := newUploadTestMetadataStore()
 	store.SetRead(filepath.Dir(targetPath), "metadata.yaml", map[string]protocol.FileMetadata{
-		targetPath: {Status: protocol.NotSent},
+		targetPath: {Status: string(protocol.NotSent)},
 	})
 	client := &uploadTestSFTPClient{}
 	logger := &uploadTestLogger{}
@@ -471,7 +471,7 @@ func TestUploaderSearch_ReconnectFactoryErrorPropagatesWithoutTransition(t *test
 	targetPath := uploadMustWriteFile(t, root, "album/photo.jpg", []byte("photo"))
 	store := newUploadTestMetadataStore()
 	store.SetRead(filepath.Dir(targetPath), "metadata.yaml", map[string]protocol.FileMetadata{
-		targetPath: {Status: protocol.NotSent},
+		targetPath: {Status: string(protocol.NotSent)},
 	})
 	client := &uploadTestSFTPClient{
 		freeSpaceResults: []uploadFreeSpaceResult{{size: 1 << 20}},
@@ -595,7 +595,7 @@ func TestUploaderRun_ReconnectClosesInitialClientAndLeavesReplacementUndeferred(
 	targetPath := uploadMustWriteFile(t, filepath.Join(root, "synology"), "album/photo.jpg", []byte("photo"))
 	store := newUploadTestMetadataStore()
 	store.SetRead(filepath.Dir(targetPath), "metadata.yaml", map[string]protocol.FileMetadata{
-		targetPath: {Status: protocol.NotSent},
+		targetPath: {Status: string(protocol.NotSent)},
 	})
 	initialClient := &uploadTestSFTPClient{freeSpaceResults: []uploadFreeSpaceResult{{size: 1 << 20}}, sendResults: []uploadSendResult{{err: stderrors.New("connection lost")}}}
 	currentClient := &uploadTestSFTPClient{freeSpaceResults: []uploadFreeSpaceResult{{size: 1 << 20}}, sendResults: []uploadSendResult{{size: 12}}, closeErr: stderrors.New("current close boom")}
