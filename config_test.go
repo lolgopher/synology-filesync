@@ -1,6 +1,12 @@
 package main
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"reflect"
+	"runtime"
+	"testing"
+)
 
 func newValidConfig() *Config {
 	return &Config{
@@ -273,5 +279,250 @@ func TestVerifyConfigDisabledTypes(t *testing.T) {
 				t.Fatalf("verifyConfig() error = %v, want nil", err)
 			}
 		})
+	}
+}
+
+func TestInitConfigExistingFile(t *testing.T) {
+	restoreDefaultConfig(t)
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	contents := []byte(`download_type: synology
+synology:
+  ip: 10.0.0.1
+  port: 5001
+  username: existing-user
+  password: existing-pass
+  path: /existing/photo
+upload_type: ssh
+ssh:
+  ip: 10.0.0.2
+  port: 2222
+  username: upload-user
+  password: upload-pass
+  path: /existing/upload
+db_type: yaml
+yaml:
+  filename: existing.yaml
+local_path: /existing/local
+spare_space: 2048
+sync_cycle: 6
+download_worker: 3
+download_delay: 4
+download_retry_delay: 5
+download_retry_count: 6
+upload_delay: 7
+upload_retry_delay: 8
+upload_retry_count: 9
+`)
+	if err := os.WriteFile(path, contents, 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	got, err := initConfig(path)
+	if err != nil {
+		t.Fatalf("initConfig() error = %v, want nil", err)
+	}
+	want := &Config{
+		DownloadType: "synology",
+		Synology: &Address{
+			IP:       "10.0.0.1",
+			Port:     5001,
+			Username: "existing-user",
+			Password: "existing-pass",
+			Path:     "/existing/photo",
+		},
+		UploadType: "ssh",
+		SSH: &Address{
+			IP:       "10.0.0.2",
+			Port:     2222,
+			Username: "upload-user",
+			Password: "upload-pass",
+			Path:     "/existing/upload",
+		},
+		DBType:             "yaml",
+		YAML:               &FileDB{Filename: "existing.yaml"},
+		LocalPath:          "/existing/local",
+		SpareSpace:         2048,
+		SyncCycle:          6,
+		DownloadWorker:     3,
+		DownloadDelay:      4,
+		DownloadRetryDelay: 5,
+		DownloadRetryCount: 6,
+		UploadDelay:        7,
+		UploadRetryDelay:   8,
+		UploadRetryCount:   9,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("initConfig() = %#v, want %#v", got, want)
+	}
+}
+
+func TestInitConfigMissingFile(t *testing.T) {
+	restoreDefaultConfig(t)
+	path := filepath.Join(t.TempDir(), "missing.yaml")
+	workingDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working directory: %v", err)
+	}
+
+	got, err := initConfig(path)
+	if err == nil {
+		t.Fatal("initConfig() error = nil, want missing-file error")
+	}
+	if got != nil {
+		t.Fatalf("initConfig() config = %#v, want nil", got)
+	}
+	if defaultConfig.LocalPath != workingDir {
+		t.Fatalf("default local path after missing config = %q, want %q", defaultConfig.LocalPath, workingDir)
+	}
+}
+
+func TestInitConfigMalformedFile(t *testing.T) {
+	restoreDefaultConfig(t)
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte("download_type: [\n"), 0o600); err != nil {
+		t.Fatalf("write malformed config: %v", err)
+	}
+
+	got, err := initConfig(path)
+	if err == nil {
+		t.Fatal("initConfig() error = nil, want malformed YAML error")
+	}
+	if got != nil {
+		t.Fatalf("initConfig() config = %#v, want nil", got)
+	}
+}
+
+func TestMakeDefaultConfigCreatesCurrentSchema(t *testing.T) {
+	chdirTemp(t)
+	restoreDefaultConfig(t)
+	workingDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working directory: %v", err)
+	}
+
+	if _, err := initConfig(defaultConfigPath); err == nil {
+		t.Fatal("initConfig(missing default) error = nil, want missing-file error")
+	}
+
+	if err := makeDefaultConfig(); err != nil {
+		t.Fatalf("makeDefaultConfig() error = %v, want nil", err)
+	}
+
+	got, err := initConfig(defaultConfigPath)
+	if err != nil {
+		t.Fatalf("initConfig(default config) error = %v, want nil", err)
+	}
+	want := currentDefaultConfig(workingDir)
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("created default config = %#v, want %#v", got, want)
+	}
+	if err := verifyConfig(got); err != nil {
+		t.Fatalf("verifyConfig(created default) error = %v, want nil", err)
+	}
+}
+
+func TestInitConfigDoesNotOverwriteExistingDefault(t *testing.T) {
+	chdirTemp(t)
+	restoreDefaultConfig(t)
+
+	want := []byte(`download_type: disabled
+upload_type: disabled
+db_type: disabled
+local_path: /existing/local
+`)
+	if err := os.WriteFile(defaultConfigPath, want, 0o600); err != nil {
+		t.Fatalf("write existing config: %v", err)
+	}
+
+	if _, err := initConfig(defaultConfigPath); err != nil {
+		t.Fatalf("initConfig() error = %v, want nil", err)
+	}
+	got, err := os.ReadFile(defaultConfigPath)
+	if err != nil {
+		t.Fatalf("read existing config: %v", err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("existing config after initConfig() = %q, want %q", got, want)
+	}
+}
+
+func TestCurrentDefaultConfigSchema(t *testing.T) {
+	restoreDefaultConfig(t)
+	want := currentDefaultConfig("")
+	if !reflect.DeepEqual(defaultConfig, want) {
+		t.Fatalf("defaultConfig = %#v, want %#v", defaultConfig, want)
+	}
+}
+
+func chdirTemp(t *testing.T) string {
+	t.Helper()
+
+	oldDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working directory: %v", err)
+	}
+	tempDir := t.TempDir()
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("change working directory: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(oldDir); err != nil {
+			t.Errorf("restore working directory: %v", err)
+		}
+	})
+	return tempDir
+}
+
+func restoreDefaultConfig(t *testing.T) {
+	t.Helper()
+
+	saved := *defaultConfig
+	if defaultConfig.Synology != nil {
+		synology := *defaultConfig.Synology
+		saved.Synology = &synology
+	}
+	if defaultConfig.SSH != nil {
+		ssh := *defaultConfig.SSH
+		saved.SSH = &ssh
+	}
+	if defaultConfig.YAML != nil {
+		yaml := *defaultConfig.YAML
+		saved.YAML = &yaml
+	}
+	t.Cleanup(func() {
+		*defaultConfig = saved
+	})
+}
+
+func currentDefaultConfig(localPath string) *Config {
+	return &Config{
+		DownloadType: "synology",
+		Synology: &Address{
+			IP:       "1.2.3.4",
+			Port:     5001,
+			Username: "admin",
+			Password: "pass",
+			Path:     "/photo",
+		},
+		UploadType: "ssh",
+		SSH: &Address{
+			IP:       "192.168.0.100",
+			Port:     22,
+			Username: "user",
+			Password: "pass",
+			Path:     "/DCIM",
+		},
+		DBType:             "yaml",
+		YAML:               &FileDB{Filename: "metadata.yaml"},
+		LocalPath:          localPath,
+		SpareSpace:         1073741824,
+		SyncCycle:          12,
+		DownloadWorker:     runtime.GOMAXPROCS(0),
+		DownloadDelay:      10,
+		DownloadRetryDelay: 2,
+		DownloadRetryCount: 10,
+		UploadDelay:        10,
+		UploadRetryDelay:   2,
+		UploadRetryCount:   10,
 	}
 }
