@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path"
 	"runtime"
 	"strconv"
 
@@ -42,6 +43,8 @@ type Config struct {
 	DBType    string  `yaml:"db_type"`
 	YAML      *FileDB `yaml:"yaml,omitempty"`
 	LocalPath string  `yaml:"local_path"`
+
+	ExcludePaths []string `yaml:"exclude_paths,omitempty"`
 
 	SpareSpace     uint64 `yaml:"spare_space"`
 	SyncCycle      int    `yaml:"sync_cycle"`
@@ -185,6 +188,11 @@ func Validate(config *Config) error {
 
 	if len(config.LocalPath) == 0 {
 		return errors.New("local path is required")
+	}
+	for _, excludePath := range config.ExcludePaths {
+		if !path.IsAbs(excludePath) {
+			return errors.New("exclude path must be absolute")
+		}
 	}
 
 	return nil

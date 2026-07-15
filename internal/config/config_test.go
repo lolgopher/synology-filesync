@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -144,6 +145,20 @@ func TestVerifyConfigExactErrors(t *testing.T) {
 			},
 			wantErr: "local path is required",
 		},
+		{
+			name: "exclude path relative",
+			mutate: func(cfg *Config) {
+				cfg.ExcludePaths = []string{"relative/path"}
+			},
+			wantErr: "exclude path must be absolute",
+		},
+		{
+			name: "exclude path empty",
+			mutate: func(cfg *Config) {
+				cfg.ExcludePaths = []string{""}
+			},
+			wantErr: "exclude path must be absolute",
+		},
 	}
 
 	for _, tt := range tests {
@@ -224,6 +239,14 @@ func TestVerifyConfigValidationOrder(t *testing.T) {
 			},
 			wantErr: "filename is required",
 		},
+		{
+			name: "local path before exclude path",
+			mutate: func(cfg *Config) {
+				cfg.LocalPath = ""
+				cfg.ExcludePaths = []string{"relative/path"}
+			},
+			wantErr: "local path is required",
+		},
 	}
 
 	for _, tt := range tests {
@@ -282,6 +305,37 @@ func TestVerifyConfigDisabledTypes(t *testing.T) {
 	}
 }
 
+func TestVerifyConfigExcludePathsValid(t *testing.T) {
+	tests := []struct {
+		name         string
+		excludePaths []string
+	}{
+		{
+			name:         "nil exclude paths",
+			excludePaths: nil,
+		},
+		{
+			name:         "empty exclude paths",
+			excludePaths: []string{},
+		},
+		{
+			name:         "absolute exclude paths",
+			excludePaths: []string{"/volume1/photo/@eaDir", "/volume1/photo/../photo/#recycle"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := newValidConfig()
+			cfg.ExcludePaths = tt.excludePaths
+
+			if err := verifyConfig(cfg); err != nil {
+				t.Fatalf("verifyConfig() error = %v, want nil", err)
+			}
+		})
+	}
+}
+
 func TestInitConfigExistingFile(t *testing.T) {
 	restoreDefaultConfig(t)
 	path := filepath.Join(t.TempDir(), "config.yaml")
@@ -303,6 +357,9 @@ db_type: yaml
 yaml:
   filename: existing.yaml
 local_path: /existing/local
+exclude_paths:
+  - /volume1/photo/@eaDir
+  - /volume1/photo/#recycle
 spare_space: 2048
 sync_cycle: 6
 download_worker: 3
@@ -341,6 +398,7 @@ upload_retry_count: 9
 		DBType:             "yaml",
 		YAML:               &FileDB{Filename: "existing.yaml"},
 		LocalPath:          "/existing/local",
+		ExcludePaths:       []string{"/volume1/photo/@eaDir", "/volume1/photo/#recycle"},
 		SpareSpace:         2048,
 		SyncCycle:          6,
 		DownloadWorker:     3,
@@ -353,6 +411,49 @@ upload_retry_count: 9
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("Load() = %#v, want %#v", got, want)
+	}
+}
+
+func TestInitConfigExcludePathsOptionalEmpty(t *testing.T) {
+	tests := []struct {
+		name     string
+		contents []byte
+	}{
+		{
+			name: "missing exclude paths",
+			contents: []byte(`download_type: disabled
+upload_type: disabled
+db_type: disabled
+local_path: /existing/local
+`),
+		},
+		{
+			name: "explicit empty exclude paths",
+			contents: []byte(`download_type: disabled
+upload_type: disabled
+db_type: disabled
+local_path: /existing/local
+exclude_paths: []
+`),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			restoreDefaultConfig(t)
+			path := filepath.Join(t.TempDir(), "config.yaml")
+			if err := os.WriteFile(path, tt.contents, 0o600); err != nil {
+				t.Fatalf("write config: %v", err)
+			}
+
+			got, err := Load(path)
+			if err != nil {
+				t.Fatalf("Load() error = %v, want nil", err)
+			}
+			if len(got.ExcludePaths) != 0 {
+				t.Fatalf("Load().ExcludePaths = %#v, want empty", got.ExcludePaths)
+			}
+		})
 	}
 }
 
@@ -419,6 +520,13 @@ func TestMakeDefaultConfigCreatesCurrentSchema(t *testing.T) {
 	}
 	if err := verifyConfig(got); err != nil {
 		t.Fatalf("verifyConfig(created default) error = %v, want nil", err)
+	}
+	data, err := os.ReadFile(DefaultConfigPath)
+	if err != nil {
+		t.Fatalf("read default config: %v", err)
+	}
+	if strings.Contains(string(data), "exclude_paths") {
+		t.Fatalf("default config contains exclude_paths, want omitted: %s", string(data))
 	}
 }
 
