@@ -2,10 +2,11 @@ package main
 
 import (
 	"context"
-	"github.com/lolgopher/synology-filesync/protocol"
 	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/lolgopher/synology-filesync/protocol"
 )
 
 func downloadSynology(info *protocol.ConnectionInfo) {
@@ -35,6 +36,42 @@ func downloadSynology(info *protocol.ConnectionInfo) {
 	log.Print("Done!")
 }
 
+func isRecycleDirectory(name string) bool {
+	return name == "#recycle"
+}
+
+func initializeMetadata(filePath string, size uint64) error {
+	if !protocol.FileExists(filepath.Join(filepath.Dir(filePath), config.YAML.Filename)) {
+		if err := protocol.WriteMetadata(filePath, config.YAML.Filename, size, protocol.Init); err != nil {
+			log.Fatalf("fail to %s write metadata: %v", filePath, err)
+		}
+		log.Printf("init %s metadata", filePath)
+	} else {
+		targetMetadata, err := protocol.ReadMetadata(filepath.Dir(filePath), config.YAML.Filename)
+		if err != nil {
+			return err
+		}
+
+		if metadata, ok := targetMetadata[filePath]; !ok || metadata.Size != size {
+			if err := protocol.WriteMetadata(filePath, config.YAML.Filename, size, protocol.Init); err != nil {
+				log.Fatalf("fail to %s write metadata: %v", filePath, err)
+			}
+			log.Printf("init %s metadata", filePath)
+
+			if protocol.FileExists(filePath) {
+				if err := os.Remove(filePath); err != nil {
+					log.Fatalf("fail to %s remove file: %v", filePath, err)
+				}
+				log.Printf("remove %s file", filePath)
+			}
+		} else {
+			log.Printf("%s metedata already exist", filePath)
+		}
+	}
+
+	return nil
+}
+
 func searchSynologyRecursive(client *protocol.SynologyClient, folderPath string, depth int) (*protocol.FileListResponse, error) {
 	fileListResp, err := client.GetFileList(folderPath)
 	if err != nil {
@@ -44,7 +81,7 @@ func searchSynologyRecursive(client *protocol.SynologyClient, folderPath string,
 	for _, file := range fileListResp.Data.Files {
 		// 폴더이고 휴지통이 아니면 검색
 		if file.IsDir {
-			if file.Name != "#recycle" {
+			if !isRecycleDirectory(file.Name) {
 				if err := os.MkdirAll(filepath.Join(config.LocalPath, file.Path), os.ModePerm); err != nil {
 					log.Fatalf("fail to make download folder: %v", err)
 				}
@@ -58,35 +95,8 @@ func searchSynologyRecursive(client *protocol.SynologyClient, folderPath string,
 			initFilePath := filepath.Join(config.LocalPath, file.Path)
 
 			// 메타데이터가 없으면 초기화
-			if !protocol.FileExists(filepath.Join(filepath.Dir(initFilePath), config.YAML.Filename)) {
-				if err := protocol.WriteMetadata(initFilePath, config.YAML.Filename, file.Additional.Size, protocol.Init); err != nil {
-					log.Fatalf("fail to %s write metadata: %v", initFilePath, err)
-				}
-				log.Printf("init %s metadata", initFilePath)
-			} else {
-				// 이미 메타데이터가 존재하는지 확인
-				targetMetadata, err := protocol.ReadMetadata(filepath.Dir(initFilePath), config.YAML.Filename)
-				if err != nil {
-					return nil, err
-				}
-
-				// 메타데이터에 정보가 없거나 파일 크기가 다르면 초기화
-				if metadata, ok := targetMetadata[initFilePath]; !ok || metadata.Size != file.Additional.Size {
-					if err := protocol.WriteMetadata(initFilePath, config.YAML.Filename, file.Additional.Size, protocol.Init); err != nil {
-						log.Fatalf("fail to %s write metadata: %v", initFilePath, err)
-					}
-					log.Printf("init %s metadata", initFilePath)
-
-					// 기존 파일이 존재하면 삭제
-					if protocol.FileExists(initFilePath) {
-						if err := os.Remove(initFilePath); err != nil {
-							log.Fatalf("fail to %s remove file: %v", initFilePath, err)
-						}
-						log.Printf("remove %s file", initFilePath)
-					}
-				} else {
-					log.Printf("%s metedata already exist", initFilePath)
-				}
+			if err := initializeMetadata(initFilePath, file.Additional.Size); err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -100,7 +110,7 @@ func downloadSynologyRecursive(client *protocol.SynologyClient, fileList *protoc
 	for _, file := range fileList.Data.Files {
 		// 폴더이고 휴지통이 아니면 검색
 		if file.IsDir {
-			if file.Name != "#recycle" {
+			if !isRecycleDirectory(file.Name) {
 				if err := downloadSynologyRecursive(client, file.List); err != nil {
 					return err
 				}
