@@ -761,6 +761,85 @@ func TestDownloaderRun_ConcurrentInvocationsDoNotShareWaitGroupOrSemaphore(t *te
 	}
 }
 
+func TestDownloaderRun_WorkerErrorHandlerCalledBeforeRunReturns(t *testing.T) {
+	t.Parallel()
+
+	blockedRelease := make(chan struct{})
+	allowHandlerReturn := make(chan struct{})
+	t.Cleanup(func() {
+		closeOnce(blockedRelease)
+		closeOnce(allowHandlerReturn)
+	})
+
+	workerErr := errors.New("worker boom")
+	handlerCalled := make(chan error, 1)
+	client := newWorkerErrorTestClient(workerErr, blockedRelease)
+	d := NewDownloader(DownloadOptions{
+		RootRemotePath:   "/root",
+		LocalPath:        "/download",
+		MetadataFilename: "metadata.yaml",
+		WorkerLimit:      2,
+		SynologyFactory:  newTestSynologyFactory(client).Fn(),
+		MetadataStore:    newTestMetadataStore(),
+		Logger:           &testLogger{},
+		WorkerErrorHandler: func(err error) {
+			handlerCalled <- err
+			<-allowHandlerReturn
+		},
+	})
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- d.Run(&protocol.ConnectionInfo{})
+	}()
+
+	client.WaitForBlockedWorker(t)
+	var gotHandlerErr error
+	select {
+	case gotErr := <-handlerCalled:
+		gotHandlerErr = gotErr
+		if gotErr == nil || gotErr.Error() != "fail to /root/a.jpg download file: worker boom" {
+			t.Fatalf("handler error = %v", gotErr)
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timed out waiting for worker error handler")
+	}
+	assertNoResult(t, errCh)
+	closeOnce(blockedRelease)
+	assertNoResult(t, errCh)
+	closeOnce(allowHandlerReturn)
+
+	select {
+	case err := <-errCh:
+		if err != gotHandlerErr {
+			t.Fatalf("Run() error = %v, want exact handler error %v", err, gotHandlerErr)
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("Run() did not return after releasing blocked worker")
+	}
+}
+
+func TestDownloaderRun_WorkerErrorHandlerNilKeepsNormalBehavior(t *testing.T) {
+	t.Parallel()
+
+	workerErr := errors.New("worker boom")
+	client := newWorkerErrorTestClient(workerErr, nil)
+	d := NewDownloader(DownloadOptions{
+		RootRemotePath:   "/root",
+		LocalPath:        "/download",
+		MetadataFilename: "metadata.yaml",
+		WorkerLimit:      2,
+		SynologyFactory:  newTestSynologyFactory(client).Fn(),
+		MetadataStore:    newTestMetadataStore(),
+		Logger:           &testLogger{},
+	})
+
+	err := d.Run(&protocol.ConnectionInfo{})
+	if err == nil || err.Error() != "fail to /root/a.jpg download file: worker boom" {
+		t.Fatalf("Run() error = %v", err)
+	}
+}
+
 func TestDownloadWorkerFirstError(t *testing.T) {
 	t.Parallel()
 
@@ -882,6 +961,63 @@ func (s *testMetadataStore) WriteCalls() []metadataWriteCall {
 type downloadCall struct {
 	filePath string
 	destPath string
+}
+
+type workerErrorTestClient struct {
+	workerErr          error
+	blockedRelease     <-chan struct{}
+	blockedStarted     chan struct{}
+	blockedStartedOnce sync.Once
+	mu                 sync.Mutex
+	downloadCalls      []downloadCall
+}
+
+func newWorkerErrorTestClient(workerErr error, blockedRelease <-chan struct{}) *workerErrorTestClient {
+	return &workerErrorTestClient{
+		workerErr:      workerErr,
+		blockedRelease: blockedRelease,
+		blockedStarted: make(chan struct{}),
+	}
+}
+
+func (c *workerErrorTestClient) GetFileList(folderPath string) (*protocol.FileListResponse, error) {
+	if folderPath != "/root" {
+		return response(), nil
+	}
+
+	return response(
+		file("a.jpg", "/root/a.jpg", 1),
+		file("b.jpg", "/root/b.jpg", 1),
+	), nil
+}
+
+func (c *workerErrorTestClient) DownloadFile(filePath, destPath string) (string, int64, error) {
+	c.mu.Lock()
+	c.downloadCalls = append(c.downloadCalls, downloadCall{filePath: filePath, destPath: destPath})
+	c.mu.Unlock()
+
+	if filePath == "/root/a.jpg" {
+		<-c.blockedStarted
+		return "", 0, c.workerErr
+	}
+
+	c.blockedStartedOnce.Do(func() {
+		close(c.blockedStarted)
+	})
+	if c.blockedRelease != nil {
+		<-c.blockedRelease
+	}
+	return destPath, 0, nil
+}
+
+func (c *workerErrorTestClient) WaitForBlockedWorker(t *testing.T) {
+	t.Helper()
+
+	select {
+	case <-c.blockedStarted:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timed out waiting for blocked worker")
+	}
 }
 
 type downloadResult struct {
@@ -1151,6 +1287,13 @@ func assertNoResult(t *testing.T, errCh <-chan error) {
 		t.Fatalf("received early result: %v", err)
 	case <-time.After(40 * time.Millisecond):
 	}
+}
+
+func closeOnce(ch chan struct{}) {
+	defer func() {
+		_ = recover()
+	}()
+	close(ch)
 }
 
 func assertMetadataWrite(t *testing.T, got metadataWriteCall, wantPath, wantFilename string, wantSize uint64, wantStatus protocol.FileTransferStatus) {

@@ -11,6 +11,8 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
+type WorkerErrorHandler func(error)
+
 type DownloadOptions struct {
 	RootRemotePath   string
 	LocalPath        string
@@ -20,21 +22,23 @@ type DownloadOptions struct {
 	MkdirAll func(string, os.FileMode) error
 	Remove   func(string) error
 
-	SynologyFactory SynologyFactory
-	MetadataStore   MetadataStore
-	Logger          Logger
+	SynologyFactory    SynologyFactory
+	MetadataStore      MetadataStore
+	Logger             Logger
+	WorkerErrorHandler WorkerErrorHandler
 }
 
 type Downloader struct {
-	rootRemotePath   string
-	localPath        string
-	metadataFilename string
-	workerLimit      int64
-	mkdirAll         func(string, os.FileMode) error
-	remove           func(string) error
-	synologyFactory  SynologyFactory
-	metadataStore    MetadataStore
-	logger           Logger
+	rootRemotePath     string
+	localPath          string
+	metadataFilename   string
+	workerLimit        int64
+	mkdirAll           func(string, os.FileMode) error
+	remove             func(string) error
+	synologyFactory    SynologyFactory
+	metadataStore      MetadataStore
+	logger             Logger
+	workerErrorHandler WorkerErrorHandler
 }
 
 func NewDownloader(opts DownloadOptions) *Downloader {
@@ -49,15 +53,16 @@ func NewDownloader(opts DownloadOptions) *Downloader {
 	}
 
 	return &Downloader{
-		rootRemotePath:   opts.RootRemotePath,
-		localPath:        opts.LocalPath,
-		metadataFilename: opts.MetadataFilename,
-		workerLimit:      opts.WorkerLimit,
-		mkdirAll:         mkdirAll,
-		remove:           remove,
-		synologyFactory:  opts.SynologyFactory,
-		metadataStore:    opts.MetadataStore,
-		logger:           opts.Logger,
+		rootRemotePath:     opts.RootRemotePath,
+		localPath:          opts.LocalPath,
+		metadataFilename:   opts.MetadataFilename,
+		workerLimit:        opts.WorkerLimit,
+		mkdirAll:           mkdirAll,
+		remove:             remove,
+		synologyFactory:    opts.SynologyFactory,
+		metadataStore:      opts.MetadataStore,
+		logger:             opts.Logger,
+		workerErrorHandler: opts.WorkerErrorHandler,
 	}
 }
 
@@ -149,6 +154,9 @@ func (d *Downloader) downloadSynologyRecursive(client SynologyClient, fileList *
 			}()
 
 			if err := d.downloadFile(client, filePath); err != nil {
+				if d.workerErrorHandler != nil {
+					d.workerErrorHandler(err)
+				}
 				workerErr.Add(err)
 			}
 		}()

@@ -1,11 +1,14 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/lolgopher/synology-filesync/internal/app"
 )
 
 const mainVersionHelperEnv = "SYNology_FILESYNC_MAIN_VERSION_HELPER"
@@ -49,4 +52,34 @@ func TestMainVersionHelper(t *testing.T) {
 	os.Args = []string{os.Args[0], "-v"}
 	main()
 	t.Fatal("main returned after -v; want process exit")
+}
+
+func TestFormatCycleError(t *testing.T) {
+	downloadErr := errors.New("download failed")
+	uploadErr := errors.New("upload failed")
+
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{
+			name: "download text unchanged",
+			err:  &app.StageError{Stage: app.DownloadStage, Err: downloadErr},
+			want: "download failed",
+		},
+		{
+			name: "other upload error",
+			err:  &app.StageError{Stage: app.UploadStage, Err: uploadErr},
+			want: "fail to search local: upload failed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := formatCycleError(tt.err); got != tt.want {
+				t.Errorf("formatCycleError() = %q, want %q", got, tt.want)
+			}
+		})
+	}
 }
