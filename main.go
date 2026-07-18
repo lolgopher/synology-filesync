@@ -46,6 +46,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("fail to init config: %v", err)
 	}
+	if err := validateRuntimeSupport(config); err != nil {
+		log.Fatalf("fail to init runtime: %v", err)
+	}
 
 	store := metadatainfra.NewStore()
 	synologyFactory := app.SynologyFactory(func(info *protocol.ConnectionInfo) (app.SynologyClient, error) {
@@ -108,6 +111,19 @@ func main() {
 			log.Fatal(formatCycleError(err))
 		}
 	}
+}
+
+func validateRuntimeSupport(config *internalconfig.Config) error {
+	if config.DownloadType != "synology" {
+		return fmt.Errorf("download type %q is not supported", config.DownloadType)
+	}
+	if config.UploadType != "ssh" {
+		return fmt.Errorf("upload type %q is not supported", config.UploadType)
+	}
+	if config.DBType != "yaml" {
+		return fmt.Errorf("db type %q is not supported", config.DBType)
+	}
+	return nil
 }
 
 func formatCycleError(err error) string {
