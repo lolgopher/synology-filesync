@@ -118,7 +118,7 @@ func formatCycleError(err error) string {
 
 	var initialErr *app.InitialSFTPError
 	if errors.As(err, &initialErr) {
-		return fmt.Sprintf("fail to make srtp client: %v", err)
+		return fmt.Sprintf("fail to make sftp client: %v", err)
 	}
 	var reconnectErr *app.ReconnectSFTPError
 	if errors.As(err, &reconnectErr) {

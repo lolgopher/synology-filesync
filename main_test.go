@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/lolgopher/synology-filesync/internal/app"
+	"github.com/lolgopher/synology-filesync/protocol"
 )
 
 const mainVersionHelperEnv = "SYNology_FILESYNC_MAIN_VERSION_HELPER"
@@ -57,6 +58,7 @@ func TestMainVersionHelper(t *testing.T) {
 func TestFormatCycleError(t *testing.T) {
 	downloadErr := errors.New("download failed")
 	uploadErr := errors.New("upload failed")
+	initialErr := newInitialSFTPError(t, errors.New("initial failed"))
 
 	tests := []struct {
 		name string
@@ -73,6 +75,11 @@ func TestFormatCycleError(t *testing.T) {
 			err:  &app.StageError{Stage: app.UploadStage, Err: uploadErr},
 			want: "fail to search local: upload failed",
 		},
+		{
+			name: "initial sftp upload error",
+			err:  &app.StageError{Stage: app.UploadStage, Err: initialErr},
+			want: "fail to make sftp client: initial failed",
+		},
 	}
 
 	for _, tt := range tests {
@@ -82,4 +89,21 @@ func TestFormatCycleError(t *testing.T) {
 			}
 		})
 	}
+}
+
+func newInitialSFTPError(t *testing.T, cause error) error {
+	t.Helper()
+
+	uploader := app.NewUploader(app.UploadOptions{}, nil, func(*protocol.ConnectionInfo) (app.SFTPClient, error) {
+		return nil, cause
+	}, nil, nil)
+	err := uploader.Run(&protocol.ConnectionInfo{})
+	if err == nil {
+		t.Fatal("Run() error = nil, want *app.InitialSFTPError")
+	}
+	var initialErr *app.InitialSFTPError
+	if !errors.As(err, &initialErr) {
+		t.Fatalf("Run() error = %T %v, want *app.InitialSFTPError", err, err)
+	}
+	return err
 }
