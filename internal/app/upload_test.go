@@ -14,12 +14,13 @@ import (
 	pkgerrors "github.com/pkg/errors"
 )
 
-func TestUploaderSearch_SkipsLiteralMetadataYAML(t *testing.T) {
+func TestUploaderSearch_SkipsLiteralAndConfiguredMetadataYAML(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
 	targetPath := uploadMustWriteFile(t, root, "album/photo.jpg", []byte("photo"))
 	uploadMustWriteFile(t, root, "album/metadata.yaml", []byte("ignored"))
+	uploadMustWriteFile(t, root, "album/custom.yaml", []byte("ignored"))
 
 	store := newUploadTestMetadataStore()
 	store.SetRead(filepath.Dir(targetPath), "custom.yaml", map[string]protocol.FileMetadata{
@@ -34,14 +35,39 @@ func TestUploaderSearch_SkipsLiteralMetadataYAML(t *testing.T) {
 	if err := uploader.Search(root); err != nil {
 		t.Fatalf("Search() error = %v", err)
 	}
-	if got := store.ReadCalls(); len(got) != 1 {
-		t.Fatalf("read calls = %#v, want 1", got)
-	}
-	if got := store.ReadCalls()[0]; got.folderPath != filepath.Dir(targetPath) || got.filename != "custom.yaml" {
-		t.Fatalf("read call = %#v", got)
+	if got := store.ReadCalls(); !reflect.DeepEqual(got, []uploadReadCall{{folderPath: filepath.Dir(targetPath), filename: "custom.yaml"}}) {
+		t.Fatalf("read calls = %#v", got)
 	}
 	if len(store.WriteCalls()) != 0 || len(client.sendCalls) != 0 || len(sleeper.Durations()) != 0 {
 		t.Fatalf("unexpected side effects: write=%#v send=%#v sleep=%#v", store.WriteCalls(), client.sendCalls, sleeper.Durations())
+	}
+	if !logger.ContainsExact(targetPath + " has already been sent") {
+		t.Fatalf("logs = %#v", logger.Entries())
+	}
+}
+
+func TestUploaderSearch_EmptyYAMLFilenameDoesNotSkipPayload(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	targetPath := uploadMustWriteFile(t, root, "album/photo.jpg", []byte("photo"))
+	store := newUploadTestMetadataStore()
+	store.SetRead(filepath.Dir(targetPath), "", map[string]protocol.FileMetadata{
+		targetPath: {Status: string(protocol.Sent)},
+	})
+	logger := &uploadTestLogger{}
+	client := &uploadTestSFTPClient{}
+	uploader := NewUploader(UploadOptions{LocalPath: root}, store, newUploadTestSFTPFactory(client).Fn(), logger, nil)
+	uploader.client = client
+
+	if err := uploader.Search(root); err != nil {
+		t.Fatalf("Search() error = %v", err)
+	}
+	if got := store.ReadCalls(); !reflect.DeepEqual(got, []uploadReadCall{{folderPath: filepath.Dir(targetPath), filename: ""}}) {
+		t.Fatalf("read calls = %#v", got)
+	}
+	if len(store.WriteCalls()) != 0 || len(client.sendCalls) != 0 || len(client.removeCalls) != 0 || len(client.freeSpaceCalls) != 0 {
+		t.Fatalf("unexpected side effects: write=%#v send=%#v remove=%#v free=%#v", store.WriteCalls(), client.sendCalls, client.removeCalls, client.freeSpaceCalls)
 	}
 	if !logger.ContainsExact(targetPath + " has already been sent") {
 		t.Fatalf("logs = %#v", logger.Entries())

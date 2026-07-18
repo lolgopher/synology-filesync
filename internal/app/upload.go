@@ -136,7 +136,8 @@ func (u *Uploader) Search(folderPath string) error {
 			}
 		}
 
-		if !info.IsDir() && info.Name() != "metadata.yaml" {
+		if !info.IsDir() && info.Name() != "metadata.yaml" &&
+			(u.options.YAMLFilename == "" || info.Name() != u.options.YAMLFilename) {
 			targetMetadata, err := u.metadataStore.Read(filepath.Dir(targetPath), u.options.YAMLFilename)
 			if err != nil {
 				return err
