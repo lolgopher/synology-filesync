@@ -633,12 +633,12 @@ func TestUploaderSend_ReconnectTriggerErrorsReuseConnInfoAndPersistOriginalError
 			targetPath := uploadMustWriteFile(t, root, "album/photo.jpg", []byte("photo"))
 			destPath := filepath.Join("/remote", strings.TrimPrefix(targetPath, root))
 			oldClient := &uploadTestSFTPClient{
-				freeSpaceResults: []uploadFreeSpaceResult{{size: 1 << 20}, {size: 1 << 20}},
-				sendResults:      []uploadSendResult{{err: tt.sendErr}, {size: 31}},
+				freeSpaceResults: []uploadFreeSpaceResult{{size: 1 << 20}},
+				sendResults:      []uploadSendResult{{err: tt.sendErr}},
 			}
 			newClient := &uploadTestSFTPClient{
-				freeSpaceResults: []uploadFreeSpaceResult{{size: 1 << 20}},
-				sendResults:      []uploadSendResult{{size: 29}},
+				freeSpaceResults: []uploadFreeSpaceResult{{size: 1 << 20}, {size: 1 << 20}},
+				sendResults:      []uploadSendResult{{size: 29}, {size: 31}},
 			}
 			logger := &uploadTestLogger{}
 			sleeper := &uploadTestSleeper{}
@@ -665,8 +665,8 @@ func TestUploaderSend_ReconnectTriggerErrorsReuseConnInfoAndPersistOriginalError
 			if factoryCalls != 1 || !reflect.DeepEqual(factoryInfos, []*protocol.ConnectionInfo{info}) {
 				t.Fatalf("factory calls/info = %d %#v", factoryCalls, factoryInfos)
 			}
-			if uploader.client != oldClient {
-				t.Fatalf("uploader.client = %p, want old client %p", uploader.client, oldClient)
+			if uploader.client != newClient {
+				t.Fatalf("uploader.client = %p, want replacement client %p", uploader.client, newClient)
 			}
 			if oldClient.closeCalls != 1 {
 				t.Fatalf("old client close calls = %d, want 1", oldClient.closeCalls)
@@ -685,10 +685,10 @@ func TestUploaderSend_ReconnectTriggerErrorsReuseConnInfoAndPersistOriginalError
 			if secondSize != 31 || secondErr != nil {
 				t.Fatalf("second Send() = (%d, %v), want (31, nil)", secondSize, secondErr)
 			}
-			if got := oldClient.sendCalls; !reflect.DeepEqual(got, []uploadSendCall{{localPath: targetPath, remotePath: destPath}, {localPath: targetPath, remotePath: destPath}}) {
+			if got := oldClient.sendCalls; !reflect.DeepEqual(got, []uploadSendCall{{localPath: targetPath, remotePath: destPath}}) {
 				t.Fatalf("old client send calls = %#v", got)
 			}
-			if got := newClient.sendCalls; !reflect.DeepEqual(got, []uploadSendCall{{localPath: targetPath, remotePath: destPath}}) {
+			if got := newClient.sendCalls; !reflect.DeepEqual(got, []uploadSendCall{{localPath: targetPath, remotePath: destPath}, {localPath: targetPath, remotePath: destPath}}) {
 				t.Fatalf("new client send calls after second send = %#v", got)
 			}
 			if got := sleeper.Durations(); !reflect.DeepEqual(got, []time.Duration{2 * time.Second}) {
@@ -825,7 +825,7 @@ func TestUploaderRun_ReturnsSearchErrorAndLogsCloseError(t *testing.T) {
 	}
 }
 
-func TestUploaderRun_ReconnectClosesInitialClientAndLeavesReplacementUndeferred(t *testing.T) {
+func TestUploaderRun_ReconnectClosesInitialAndReplacementClients(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
@@ -842,11 +842,11 @@ func TestUploaderRun_ReconnectClosesInitialClientAndLeavesReplacementUndeferred(
 	if err := uploader.Run(&protocol.ConnectionInfo{IP: "1.2.3.4"}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
-	if initialClient.closeCalls != 2 {
-		t.Fatalf("initial client close calls = %d, want 2", initialClient.closeCalls)
+	if initialClient.closeCalls != 1 {
+		t.Fatalf("initial client close calls = %d, want 1", initialClient.closeCalls)
 	}
-	if currentClient.closeCalls != 0 {
-		t.Fatalf("replacement client close calls = %d, want 0", currentClient.closeCalls)
+	if currentClient.closeCalls != 1 {
+		t.Fatalf("replacement client close calls = %d, want 1", currentClient.closeCalls)
 	}
 	destPath := filepath.Join("/remote", strings.TrimPrefix(targetPath, root))
 	if got := currentClient.sendCalls; !reflect.DeepEqual(got, []uploadSendCall{{localPath: targetPath, remotePath: destPath}}) {
@@ -859,12 +859,10 @@ func TestUploaderRun_ReconnectClosesInitialClientAndLeavesReplacementUndeferred(
 		fmt.Sprintf("fail to %s send file over sftp: connection lost", targetPath),
 		"retrying...",
 		fmt.Sprintf("fail to %s not sent file: fail to %s send file over sftp: connection lost", targetPath, targetPath),
+		"fail to close sftp client: current close boom",
 	}
 	if got := logger.Entries(); !reflect.DeepEqual(got, wantLogs) {
 		t.Fatalf("logs = %#v", got)
-	}
-	if logger.ContainsExact("fail to close sftp client: current close boom") {
-		t.Fatalf("logs = %#v", logger.Entries())
 	}
 }
 

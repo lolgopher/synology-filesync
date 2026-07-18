@@ -243,6 +243,7 @@ func (u *Uploader) Send(targetPath string) (int, error) {
 
 				_ = client.Close()
 				client = newSFTP
+				u.client = newSFTP
 			}
 
 			if err := client.RemoveFile(destPath); err != nil {
