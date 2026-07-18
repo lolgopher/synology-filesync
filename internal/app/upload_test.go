@@ -442,6 +442,48 @@ func TestUploaderSend_InsufficientSpaceRetriesAndReturnsLastError(t *testing.T) 
 	}
 }
 
+func TestUploaderSend_MissingTargetPathReturnsAndLogsStatError(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	targetPath := filepath.Join(root, "album", "missing.jpg")
+	destPath := filepath.Join("/remote", strings.TrimPrefix(targetPath, root))
+	client := &uploadTestSFTPClient{
+		freeSpaceResults: []uploadFreeSpaceResult{{size: 1 << 20}},
+		sendResults:      []uploadSendResult{{size: 13}},
+	}
+	logger := &uploadTestLogger{}
+	uploader := NewUploader(UploadOptions{LocalPath: root, SSHPath: "/remote", UploadRetryCount: 1}, newUploadTestMetadataStore(), newUploadTestSFTPFactory(client).Fn(), logger, nil)
+	uploader.client = client
+
+	size, err := uploader.Send(targetPath)
+	if size != 13 {
+		t.Fatalf("Send() size = %d, want 13", size)
+	}
+	wantErrPrefix := fmt.Sprintf("fail to get %s file info: ", targetPath)
+	if err == nil || !strings.HasPrefix(err.Error(), wantErrPrefix) {
+		t.Fatalf("Send() error = %v, want prefix %q", err, wantErrPrefix)
+	}
+	if strings.Contains(err.Error(), "<nil>") {
+		t.Fatalf("Send() error = %q, must not contain <nil>", err.Error())
+	}
+	if got := logger.Entries(); len(got) != 1 || got[0] != err.Error() {
+		t.Fatalf("logs = %#v, want exact returned error %q", got, err.Error())
+	}
+	if strings.Contains(logger.Entries()[0], "<nil>") {
+		t.Fatalf("logs = %#v, must not contain <nil>", logger.Entries())
+	}
+	if got := client.freeSpaceCalls; !reflect.DeepEqual(got, []string{"/storage/emulated"}) {
+		t.Fatalf("free space calls = %#v", got)
+	}
+	if got := client.sendCalls; !reflect.DeepEqual(got, []uploadSendCall{{localPath: targetPath, remotePath: destPath}}) {
+		t.Fatalf("send calls = %#v", got)
+	}
+	if got := client.RemoveCalls(); len(got) != 0 {
+		t.Fatalf("remove calls = %#v, want none", got)
+	}
+}
+
 func TestUploaderSearch_ZeroRetryCountMarksSentZeroSize(t *testing.T) {
 	t.Parallel()
 

@@ -203,7 +203,7 @@ func (u *Uploader) Send(targetPath string) (int, error) {
 
 		targetFileInfo, err := os.Stat(targetPath)
 		if err != nil {
-			lastError = fmt.Errorf("fail to get %s file info: %v", targetFileInfo, err)
+			lastError = fmt.Errorf("fail to get %s file info: %v", targetPath, err)
 			u.logger.Print(lastError.Error())
 		}
 
