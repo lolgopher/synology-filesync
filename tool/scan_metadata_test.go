@@ -2,6 +2,7 @@ package tool
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -86,6 +87,28 @@ func TestGetSentStatusUsesDefaultMetadataFilenameAndIgnoresMissingFiles(t *testi
 	}
 	if _, ok := got[ignoredPath]; ok {
 		t.Errorf("included entry from non-default metadata filename: %q", ignoredPath)
+	}
+}
+
+func TestGetSentStatusMissingRootReturnsPathError(t *testing.T) {
+	missingRoot := filepath.Join(t.TempDir(), "missing")
+
+	got, err := GetSentStatus(missingRoot)
+	if err == nil {
+		t.Fatal("scan missing root returned nil error")
+	}
+	var pathErr *os.PathError
+	if !errors.As(err, &pathErr) {
+		t.Fatalf("scan missing root error = %T, want *os.PathError: %v", err, err)
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("scan missing root error = %v, want os.ErrNotExist", err)
+	}
+	if pathErr.Path != missingRoot {
+		t.Fatalf("scan missing root path = %q, want %q", pathErr.Path, missingRoot)
+	}
+	if len(got) != 0 {
+		t.Fatalf("scan missing root returned %d entries, want 0: %#v", len(got), got)
 	}
 }
 

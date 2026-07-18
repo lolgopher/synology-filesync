@@ -27,6 +27,9 @@ func searchMetadata(folderPath string, status metadata.FileTransferStatus) (map[
 	result := make(map[string]metadata.FileMetadata)
 
 	err := filepath.Walk(folderPath, func(targetPath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 		if info.IsDir() {
 			if data, err := metadata.ReadMetadata(targetPath, "metadata.yaml"); err == nil {
 				for key, value := range data {
