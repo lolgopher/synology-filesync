@@ -478,7 +478,7 @@ func TestDownloaderInitializeMetadata_ReinitializesMissingOrMismatchedEntries(t 
 	}
 }
 
-func TestDownloaderInitializeMetadata_PreservesMatchingMetadataAndLogsTypo(t *testing.T) {
+func TestDownloaderInitializeMetadata_PreservesMatchingMetadataAndLogsAlreadyExists(t *testing.T) {
 	t.Parallel()
 
 	filePath := filepath.Join("/download", "/root/a.jpg")
@@ -509,7 +509,7 @@ func TestDownloaderInitializeMetadata_PreservesMatchingMetadataAndLogsTypo(t *te
 	if removed {
 		t.Fatal("unexpected remove call")
 	}
-	wantLog := fmt.Sprintf("%s metedata already exist", filePath)
+	wantLog := fmt.Sprintf("%s metadata already exists", filePath)
 	if !logger.ContainsExact(wantLog) {
 		t.Fatalf("logs = %#v, want %q", logger.Entries(), wantLog)
 	}
@@ -611,7 +611,7 @@ func TestDownloaderDownloadFile_SkipsNonInitStatuses(t *testing.T) {
 			if len(store.WriteCalls()) != 0 {
 				t.Fatalf("unexpected metadata writes: %#v", store.WriteCalls())
 			}
-			wantLog := fmt.Sprintf("%s has already been download", filePath)
+			wantLog := fmt.Sprintf("%s has already been downloaded", filePath)
 			if !logger.ContainsExact(wantLog) {
 				t.Fatalf("logs = %#v, want %q", logger.Entries(), wantLog)
 			}
