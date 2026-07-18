@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -487,6 +488,91 @@ upload_retry_count: 9
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("Load() = %#v, want %#v", got, want)
+	}
+}
+
+func TestLoadEmptyPathUsesExistingDefault(t *testing.T) {
+	chdirTemp(t)
+	restoreDefaultConfig(t)
+	contents := []byte(`download_type: disabled
+upload_type: disabled
+db_type: disabled
+local_path: /existing/default
+spare_space: 4096
+sync_cycle: 24
+`)
+	if err := os.WriteFile(DefaultConfigPath, contents, 0o600); err != nil {
+		t.Fatalf("write default config: %v", err)
+	}
+
+	got, err := Load("")
+	if err != nil {
+		t.Fatalf("Load(\"\") error = %v, want nil", err)
+	}
+	want := &Config{
+		DownloadType: "disabled",
+		UploadType:   "disabled",
+		DBType:       "disabled",
+		LocalPath:    "/existing/default",
+		SpareSpace:   4096,
+		SyncCycle:    24,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("Load(\"\") = %#v, want %#v", got, want)
+	}
+}
+
+func TestLoadEmptyPathMissingCreatesDefault(t *testing.T) {
+	chdirTemp(t)
+	restoreDefaultConfig(t)
+	workingDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working directory: %v", err)
+	}
+
+	got, err := Load("")
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("Load(\"\") error = %v, want os.ErrNotExist", err)
+	}
+	if got != nil {
+		t.Fatalf("Load(\"\") config = %#v, want nil", got)
+	}
+	created, err := Load(DefaultConfigPath)
+	if err != nil {
+		t.Fatalf("Load(created default) error = %v, want nil", err)
+	}
+	want := currentDefaultConfig(workingDir)
+	if !reflect.DeepEqual(created, want) {
+		t.Fatalf("created default config = %#v, want %#v", created, want)
+	}
+}
+
+func TestLoadExplicitMissingPathDoesNotUseExistingDefault(t *testing.T) {
+	workingDir := chdirTemp(t)
+	restoreDefaultConfig(t)
+	contents := []byte(`download_type: disabled
+upload_type: disabled
+db_type: disabled
+local_path: /existing/default
+`)
+	if err := os.WriteFile(DefaultConfigPath, contents, 0o600); err != nil {
+		t.Fatalf("write default config: %v", err)
+	}
+	missingPath := filepath.Join(workingDir, "missing.yaml")
+
+	got, err := Load(missingPath)
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("Load(explicit missing) error = %v, want os.ErrNotExist", err)
+	}
+	if got != nil {
+		t.Fatalf("Load(explicit missing) config = %#v, want nil", got)
+	}
+	after, err := os.ReadFile(DefaultConfigPath)
+	if err != nil {
+		t.Fatalf("read existing default: %v", err)
+	}
+	if !reflect.DeepEqual(after, contents) {
+		t.Fatalf("existing default after Load() = %q, want %q", after, contents)
 	}
 }
 

@@ -101,6 +101,9 @@ const DefaultConfigPath = "./config.yaml"
 
 func Load(configPath string) (*Config, error) {
 	defaultConfig.LocalPath, _ = os.Getwd()
+	if configPath == "" {
+		configPath = DefaultConfigPath
+	}
 	var result *Config
 
 	if fileExists(configPath) {
