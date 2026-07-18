@@ -145,7 +145,7 @@ func fileExists(path string) bool {
 }
 
 func verifyAddress(address *Address, name, pathError string) error {
-	if len(address.IP) == 0 {
+	if address == nil || len(address.IP) == 0 {
 		return errors.New(name + " ip address is required")
 	}
 	if address.Port == 0 {
@@ -168,9 +168,16 @@ func verifyAddress(address *Address, name, pathError string) error {
 }
 
 func Validate(config *Config) error {
+	if config == nil {
+		return errors.New("config is required")
+	}
+
 	if config.DownloadType == "synology" {
 		if err := verifyAddress(config.Synology, "synology", "filestation path is required"); err != nil {
 			return err
+		}
+		if config.DownloadWorker <= 0 {
+			return errors.New("download worker must be positive")
 		}
 	}
 
@@ -181,7 +188,7 @@ func Validate(config *Config) error {
 	}
 
 	if config.DBType == "yaml" {
-		if len(config.YAML.Filename) == 0 {
+		if config.YAML == nil || len(config.YAML.Filename) == 0 {
 			return errors.New("filename is required")
 		}
 	}

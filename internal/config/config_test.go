@@ -31,13 +31,24 @@ func newValidConfig() *Config {
 		YAML: &FileDB{
 			Filename: "metadata.yaml",
 		},
-		LocalPath: "/tmp/synology-filesync",
+		LocalPath:      "/tmp/synology-filesync",
+		DownloadWorker: 1,
 	}
 }
 
 func TestVerifyConfigValid(t *testing.T) {
 	if err := verifyConfig(newValidConfig()); err != nil {
 		t.Fatalf("verifyConfig() error = %v, want nil", err)
+	}
+}
+
+func TestValidateNil(t *testing.T) {
+	err := Validate(nil)
+	if err == nil {
+		t.Fatal("Validate(nil) error = nil, want config-required error")
+	}
+	if err.Error() != "config is required" {
+		t.Fatalf("Validate(nil) error = %q, want %q", err.Error(), "config is required")
 	}
 }
 
@@ -51,6 +62,13 @@ func TestVerifyConfigExactErrors(t *testing.T) {
 			name: "synology ip",
 			mutate: func(cfg *Config) {
 				cfg.Synology.IP = ""
+			},
+			wantErr: "synology ip address is required",
+		},
+		{
+			name: "synology nil",
+			mutate: func(cfg *Config) {
+				cfg.Synology = nil
 			},
 			wantErr: "synology ip address is required",
 		},
@@ -90,9 +108,30 @@ func TestVerifyConfigExactErrors(t *testing.T) {
 			wantErr: "filestation path is required",
 		},
 		{
+			name: "download worker zero",
+			mutate: func(cfg *Config) {
+				cfg.DownloadWorker = 0
+			},
+			wantErr: "download worker must be positive",
+		},
+		{
+			name: "download worker negative",
+			mutate: func(cfg *Config) {
+				cfg.DownloadWorker = -1
+			},
+			wantErr: "download worker must be positive",
+		},
+		{
 			name: "ssh ip",
 			mutate: func(cfg *Config) {
 				cfg.SSH.IP = ""
+			},
+			wantErr: "ssh ip address is required",
+		},
+		{
+			name: "ssh nil",
+			mutate: func(cfg *Config) {
+				cfg.SSH = nil
 			},
 			wantErr: "ssh ip address is required",
 		},
@@ -135,6 +174,13 @@ func TestVerifyConfigExactErrors(t *testing.T) {
 			name: "yaml filename",
 			mutate: func(cfg *Config) {
 				cfg.YAML.Filename = ""
+			},
+			wantErr: "filename is required",
+		},
+		{
+			name: "yaml nil",
+			mutate: func(cfg *Config) {
+				cfg.YAML = nil
 			},
 			wantErr: "filename is required",
 		},
@@ -224,6 +270,22 @@ func TestVerifyConfigValidationOrder(t *testing.T) {
 			wantErr: "synology password is required",
 		},
 		{
+			name: "synology address before download worker",
+			mutate: func(cfg *Config) {
+				cfg.Synology.Path = ""
+				cfg.DownloadWorker = 0
+			},
+			wantErr: "filestation path is required",
+		},
+		{
+			name: "download worker before ssh",
+			mutate: func(cfg *Config) {
+				cfg.DownloadWorker = 0
+				cfg.SSH.IP = ""
+			},
+			wantErr: "download worker must be positive",
+		},
+		{
 			name: "ssh before yaml",
 			mutate: func(cfg *Config) {
 				cfg.SSH.IP = ""
@@ -275,6 +337,20 @@ func TestVerifyConfigDisabledTypes(t *testing.T) {
 			mutate: func(cfg *Config) {
 				cfg.DownloadType = "disabled"
 				cfg.Synology = nil
+			},
+		},
+		{
+			name: "download type disabled allows zero worker",
+			mutate: func(cfg *Config) {
+				cfg.DownloadType = "disabled"
+				cfg.DownloadWorker = 0
+			},
+		},
+		{
+			name: "download type disabled allows negative worker",
+			mutate: func(cfg *Config) {
+				cfg.DownloadType = "disabled"
+				cfg.DownloadWorker = -1
 			},
 		},
 		{
@@ -488,6 +564,25 @@ func TestInitConfigMalformedFile(t *testing.T) {
 	got, err := Load(path)
 	if err == nil {
 		t.Fatal("Load() error = nil, want malformed YAML error")
+	}
+	if got != nil {
+		t.Fatalf("Load() config = %#v, want nil", got)
+	}
+}
+
+func TestInitConfigEmptyFile(t *testing.T) {
+	restoreDefaultConfig(t)
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, nil, 0o600); err != nil {
+		t.Fatalf("write empty config: %v", err)
+	}
+
+	got, err := Load(path)
+	if err == nil {
+		t.Fatal("Load() error = nil, want config-required error")
+	}
+	if err.Error() != "config is required" {
+		t.Fatalf("Load() error = %q, want %q", err.Error(), "config is required")
 	}
 	if got != nil {
 		t.Fatalf("Load() config = %#v, want nil", got)
