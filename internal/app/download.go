@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -70,19 +71,23 @@ func NewDownloader(opts DownloadOptions) *Downloader {
 }
 
 func (d *Downloader) Run(info *protocol.ConnectionInfo) error {
+	if d.workerLimit <= 0 {
+		return errors.New("download worker must be positive")
+	}
+
 	client, err := d.synologyFactory(info)
 	if err != nil {
 		return fmt.Errorf("fail to make synology client: %v", err)
 	}
 
-	workerErr := &downloadWorkerFirstError{}
-	sem := semaphore.NewWeighted(d.workerLimit)
-	wg := &sync.WaitGroup{}
-
 	fileListResp, err := d.searchSynologyRecursive(client, d.rootRemotePath, 0)
 	if err != nil {
 		return fmt.Errorf("fail to search from synology filestation: %v", err)
 	}
+
+	workerErr := &downloadWorkerFirstError{}
+	sem := semaphore.NewWeighted(d.workerLimit)
+	wg := &sync.WaitGroup{}
 
 	if err := d.downloadSynologyRecursive(client, fileListResp, sem, wg, workerErr); err != nil {
 		return fmt.Errorf("fail to download from synology filestation: %v", err)

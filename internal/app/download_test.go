@@ -47,6 +47,7 @@ func TestDownloaderRun_FactoryError(t *testing.T) {
 
 	logger := &testLogger{}
 	d := NewDownloader(DownloadOptions{
+		WorkerLimit: 1,
 		SynologyFactory: func(*protocol.ConnectionInfo) (SynologyClient, error) {
 			return nil, errors.New("boom")
 		},
@@ -72,6 +73,7 @@ func TestDownloaderRun_SearchErrorWrapping(t *testing.T) {
 	d := NewDownloader(DownloadOptions{
 		RootRemotePath:   "/root",
 		MetadataFilename: "metadata.yaml",
+		WorkerLimit:      1,
 		SynologyFactory:  newTestSynologyFactory(client).Fn(),
 		MetadataStore:    newTestMetadataStore(),
 		Logger:           logger,
@@ -83,6 +85,51 @@ func TestDownloaderRun_SearchErrorWrapping(t *testing.T) {
 	}
 	if logger.ContainsExact("Done!") {
 		t.Fatal("Run() logged Done! on search error")
+	}
+}
+
+func TestDownloaderRun_NonPositiveWorkerLimit(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		limit int64
+	}{
+		{name: "zero", limit: 0},
+		{name: "negative", limit: -1},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			client := &testSynologyClient{}
+			factory := newTestSynologyFactory(client)
+			logger := &testLogger{}
+			d := NewDownloader(DownloadOptions{
+				WorkerLimit:     tt.limit,
+				SynologyFactory: factory.Fn(),
+				Logger:          logger,
+			})
+
+			err := d.Run(&protocol.ConnectionInfo{})
+			if err == nil || err.Error() != "download worker must be positive" {
+				t.Fatalf("Run() error = %v", err)
+			}
+			if got := factory.CallCount(); got != 0 {
+				t.Fatalf("synology factory calls = %d, want 0", got)
+			}
+			if got := client.GetFileListCalls(); len(got) != 0 {
+				t.Fatalf("GetFileList calls = %#v, want none", got)
+			}
+			if got := client.DownloadCalls(); len(got) != 0 {
+				t.Fatalf("DownloadFile calls = %#v, want none", got)
+			}
+			if logger.ContainsExact("Done!") {
+				t.Fatal("Run() logged Done! for non-positive worker limit")
+			}
+		})
 	}
 }
 
