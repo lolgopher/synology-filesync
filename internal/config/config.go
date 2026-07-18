@@ -1,15 +1,16 @@
-package main
+package config
 
 import (
 	"fmt"
-	"github.com/lolgopher/synology-filesync/protocol"
-	"github.com/pkg/errors"
-	"gopkg.in/yaml.v2"
 	"log"
 	"net"
 	"os"
+	"path"
 	"runtime"
 	"strconv"
+
+	"github.com/pkg/errors"
+	"gopkg.in/yaml.v2"
 )
 
 type Address struct {
@@ -42,6 +43,8 @@ type Config struct {
 	DBType    string  `yaml:"db_type"`
 	YAML      *FileDB `yaml:"yaml,omitempty"`
 	LocalPath string  `yaml:"local_path"`
+
+	ExcludePaths []string `yaml:"exclude_paths,omitempty"`
 
 	SpareSpace     uint64 `yaml:"spare_space"`
 	SyncCycle      int    `yaml:"sync_cycle"`
@@ -94,21 +97,21 @@ var defaultConfig = &Config{
 	UploadRetryCount: 10, // Upload retry count
 }
 
-const defaultConfigPath = "./config.yaml"
+const DefaultConfigPath = "./config.yaml"
 
-func initConfig(configPath string) (*Config, error) {
+func Load(configPath string) (*Config, error) {
 	defaultConfig.LocalPath, _ = os.Getwd()
+	if configPath == "" {
+		configPath = DefaultConfigPath
+	}
 	var result *Config
 
-	// 설정 파일 확인
-	if protocol.FileExists(configPath) {
-		// 파일 읽기
+	if fileExists(configPath) {
 		data, err := os.ReadFile(configPath)
 		if err != nil {
 			return nil, fmt.Errorf("fail to read %s config file: %v", configPath, err)
 		}
 
-		// YAML 언마샬링
 		if err := yaml.Unmarshal(data, &result); err != nil {
 			log.Printf("error to unmarshal read data: %s", string(data))
 			return nil, fmt.Errorf("fail to unmarshal %s config file: %v", configPath, err)
@@ -116,8 +119,7 @@ func initConfig(configPath string) (*Config, error) {
 	} else {
 		log.Printf("%s config file not found", configPath)
 
-		// 기본 설정 파일 생성
-		if !protocol.FileExists(defaultConfigPath) {
+		if !fileExists(DefaultConfigPath) {
 			if err := makeDefaultConfig(); err != nil {
 				return nil, errors.Wrap(err, "fail to make default config file")
 			}
@@ -125,7 +127,7 @@ func initConfig(configPath string) (*Config, error) {
 		return nil, os.ErrNotExist
 	}
 
-	return result, verifyConfig(result)
+	return result, Validate(result)
 }
 
 func makeDefaultConfig() error {
@@ -133,77 +135,79 @@ func makeDefaultConfig() error {
 	if err != nil {
 		return errors.Wrap(err, "fail to marshal default config")
 	}
-	if err := os.WriteFile(defaultConfigPath, configData, 0644); err != nil {
-		return fmt.Errorf("fail to write %s file: %v", defaultConfigPath, err)
+	if err := os.WriteFile(DefaultConfigPath, configData, 0644); err != nil {
+		return fmt.Errorf("fail to write %s file: %v", DefaultConfigPath, err)
 	}
 	log.Println("make default config file")
 	return nil
 }
 
-func verifyConfig(config *Config) error {
-	// verify synology
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
+}
+
+func verifyAddress(address *Address, name, pathError string) error {
+	if address == nil || len(address.IP) == 0 {
+		return errors.New(name + " ip address is required")
+	}
+	if address.Port == 0 {
+		return errors.New(name + " port is required")
+	}
+	if _, err := net.LookupPort("tcp", strconv.Itoa(address.Port)); err != nil {
+		return errors.New("invalid " + name + " port number")
+	}
+	if len(address.Username) == 0 {
+		return errors.New(name + " username is required")
+	}
+	if len(address.Password) == 0 {
+		return errors.New(name + " password is required")
+	}
+	if len(address.Path) == 0 {
+		return errors.New(pathError)
+	}
+
+	return nil
+}
+
+func Validate(config *Config) error {
+	if config == nil {
+		return errors.New("config is required")
+	}
+
 	if config.DownloadType == "synology" {
-		// verify ip address
-		if len(config.Synology.IP) == 0 {
-			return errors.New("synology ip address is required")
+		if err := verifyAddress(config.Synology, "synology", "filestation path is required"); err != nil {
+			return err
 		}
-		// verify port number
-		if config.Synology.Port == 0 {
-			return errors.New("synology port is required")
-		}
-		if _, err := net.LookupPort("tcp", strconv.Itoa(config.Synology.Port)); err != nil {
-			return errors.New("invalid synology port number")
-		}
-		// verify username and password
-		if len(config.Synology.Username) == 0 {
-			return errors.New("synology username is required")
-		}
-		if len(config.Synology.Password) == 0 {
-			return errors.New("synology password is required")
-		}
-		// verify path
-		if len(config.Synology.Path) == 0 {
-			return errors.New("filestation path is required")
+		if config.DownloadWorker <= 0 {
+			return errors.New("download worker must be positive")
 		}
 	}
 
-	// verify ssh
 	if config.UploadType == "ssh" {
-		// verify ip address
-		if len(config.SSH.IP) == 0 {
-			return errors.New("ssh ip address is required")
-		}
-		// verify port number
-		if config.SSH.Port == 0 {
-			return errors.New("ssh port is required")
-		}
-		if _, err := net.LookupPort("tcp", strconv.Itoa(config.SSH.Port)); err != nil {
-			return errors.New("invalid ssh port number")
-		}
-		// verify username and password
-		if len(config.SSH.Username) == 0 {
-			return errors.New("ssh username is required")
-		}
-		if len(config.SSH.Password) == 0 {
-			return errors.New("ssh password is required")
-		}
-		// verify path
-		if len(config.SSH.Path) == 0 {
-			return errors.New("ssh path is required")
+		if err := verifyAddress(config.SSH, "ssh", "ssh path is required"); err != nil {
+			return err
 		}
 	}
 
-	// verify yaml
 	if config.DBType == "yaml" {
-		if len(config.YAML.Filename) == 0 {
+		if config.YAML == nil || len(config.YAML.Filename) == 0 {
 			return errors.New("filename is required")
 		}
 	}
 
-	// verify local
 	if len(config.LocalPath) == 0 {
 		return errors.New("local path is required")
 	}
+	for _, excludePath := range config.ExcludePaths {
+		if !path.IsAbs(excludePath) {
+			return errors.New("exclude path must be absolute")
+		}
+	}
 
 	return nil
+}
+
+func verifyConfig(config *Config) error {
+	return Validate(config)
 }

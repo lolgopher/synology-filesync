@@ -16,7 +16,7 @@ RUN go get
 RUN go mod tidy
 RUN go mod download
 
-RUN go test
+RUN go test ./...
 RUN if [ "$BUILD_TAG" = "unknown" ]; then export BUILD_TAG=dev; fi \
     && if [ "$BUILD_TIME" = "unknown" ]; then export BUILD_TIME=$(date '+%Y-%m-%d_%H:%M:%S_%Z'); fi \
     && if [ "$GIT_HASH" = "unknown" ]; then export GIT_HASH=$(git rev-parse --short HEAD); fi \

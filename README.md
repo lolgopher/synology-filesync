@@ -41,6 +41,9 @@ SFTP를 사용해 다른 서버에 파일을 전송합니다.
       username: admin       # FileStation account username
       password: pass        # FileStation account password
       path: /photo          # FileStation path to download files
+    exclude_paths:      # Absolute Synology paths to exclude
+      - /photo/private
+      - /photo/unwanted.jpg
     upload_type: ssh    # Upload type(ssh, skip(TBD), etc...(TBD))
     ssh:
       ip: 192.168.0.100 # SSH IP address
@@ -62,6 +65,8 @@ SFTP를 사용해 다른 서버에 파일을 전송합니다.
     upload_retry_delay: 2                      # Upload retry delay(Second)
     upload_retry_count: 10                     # Upload retry count
     ```
+
+    `exclude_paths` 항목은 Synology 기준 절대 경로만 받으며, POSIX 방식의 path cleaning이 적용됩니다. 파일 경로를 넣으면 해당 파일만 제외되고, 디렉터리 경로를 넣으면 그 디렉터리와 모든 하위 경로가 재귀적으로 제외됩니다. 경계는 `/` 단위로 안전하게 일치하므로 `/photo/private` 는 `/photo/private2` 를 제외하지 않습니다. glob, regex, basename 기준 매칭은 지원하지 않습니다. `exclude_paths` 를 생략하거나 `exclude_paths: []` 로 두면 기존 동작이 그대로 유지되며 아무 것도 제외하지 않습니다.
 
 ## 빌드 방법
 
